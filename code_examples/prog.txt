@@ -1,0 +1,31 @@
+int a = 0;
+apple + brick = purple;
+
+ExampleIndefier
+123145
+Indefier2
+
+
+**fuzz*(bazz[0][45])
+
+int main() {
+	something...
+}
+
+if (a == b && b | c || 7 > 9) aboba = 7;
+
+// wehfiuhwfuhwuirfhui4545gfui5h78
+/* 3ui5th78y5giun3
+uhvyu3h478fh34uif
+ni3u4hf783hi
+*/
+
+
+abobus = "whfuinwjhbfuewfjkn//wufhuiw/*fjiwuhfyuj3f784yif3n4fu2";
+
+
+i <<= 5;
+j > 5;
+g ** 0;
+h /= 3;
+j += "425345354wegr3\n44tg3wgq3\\\"qefhy"

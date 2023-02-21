@@ -64,6 +64,7 @@ std::vector<Lexeme> PerformLexicalAnalysis(const std::wstring & code) {
     if (Fits(code, i, L"/*")) {                                   // multi-line comment
       while (j + 1 < code.size() && !Fits(code, j, L"*/"))
         ++j;
+      j += 2;
       continue;
     }
 

@@ -1,0 +1,4 @@
+int32 main() {
+  cout << "yo \"mr. white\"\\" << endl;
+  return 0;
+}
