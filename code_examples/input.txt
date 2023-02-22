@@ -1,4 +1,5 @@
 int32 main() {
+  f32 x = .0;
   cout << "yo \"mr. white\"\\" << endl;
   return 0;
 }

@@ -105,6 +105,13 @@ std::vector<Lexeme> PerformLexicalAnalysis(const std::wstring & code) {
       while (j < code.size() && IsDigit(code[j], is_hex)) {
         str.push_back(code[j++]);
       }
+      if (j < code.size() && !is_hex && code[j] == '.') {
+        str.push_back(code[j++]);
+        if (j == code.size() || !std::isdigit(code[j]))
+          throw NumberNotFinishedError(j);
+        while (j < code.size() && std::isdigit(code[j]))
+          str.push_back(code[j++]);
+      }
       result.emplace_back(LexemeType::kNumericLiteral, str);
 
     } else if (code[i] == L'"' || code[i] == L'\'') {
@@ -115,7 +122,7 @@ std::vector<Lexeme> PerformLexicalAnalysis(const std::wstring & code) {
       while (j < code.size() && code[j] != quote && code[j] != L'\n') {
         if (code[j] == L'\\') {
           if (j + 1 == code.size() || !backslash_chars.count(code[j+1]))
-            throw UnknownEscapeSequenceException(j);
+            throw UnknownEscapeSequenceError(j);
           str += backslash_chars[code[j+1]];
           j += 2;
         } else
@@ -123,7 +130,7 @@ std::vector<Lexeme> PerformLexicalAnalysis(const std::wstring & code) {
       }
 
       if (j >= code.size() || code[j] == L'\n')
-        throw StringNotEndedException(j);
+        throw StringNotEndedError(j);
       result.emplace_back(LexemeType::kStringLiteral, str);
       ++j;
     } else {
