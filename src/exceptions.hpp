@@ -1,5 +1,6 @@
 #include <stdexcept>
 #include <string>
+#include "lexeme.hpp"
 
 class TranslatorError : public std::exception {
  public:
@@ -54,4 +55,22 @@ class NumberNotFinishedError : public LexicalAnalysisError {
   const char* what() const noexcept override {
     return "Number started but not finished";
   }
+};
+
+// ==============================
+// === Syntax analysis errors ===
+// ==============================
+
+class SyntaxAnalysisError : public TranslatorError {
+ public:
+  SyntaxAnalysisError(size_t index, LexemeType expected) : TranslatorError(index), expected_(expected) {}
+
+  LexemeType GetExpected() const { return expected_; }
+
+  const char* what() const noexcept override {
+    return "Unknown error at syntax analysis stage";
+  }
+
+ private:
+  LexemeType expected_;
 };
