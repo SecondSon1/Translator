@@ -48,6 +48,8 @@ bool IsLexeme(const std::wstring & value) {
   return lexeme.GetValue() == value;
 }
 
+
+
 void Action();
 void Block();
 void Keyword();
@@ -61,6 +63,7 @@ void VariableParameter();
 void VariableParameterList();
 void DefaultParameter();
 void DefaultParameterList();
+void ParameterList();
 void LambdaFunction();
 void Function();
 void Type();
@@ -77,8 +80,6 @@ void Continue();
 void Break();
 void Return();
 void FunctionCall();
-void Priority0();
-void Sign0();
 void Priority1();
 void Sign1();
 void Priority2();
@@ -113,12 +114,14 @@ void Priority16();
 void Sign16();
 
 
+
 void Identifiers() {
   Expect(LexemeType::kIdentifier);
   GetNext();
-  if (IsLexeme(LexemeType::kPunctuation, L",")) {
+  while (IsLexeme(LexemeType::kPunctuation, L",")) {
     GetNext();
-    Identifiers();
+    Expect(LexemeType::kIdentifier);
+    GetNext();
   }
 }
 
@@ -145,10 +148,15 @@ void Keyword() {
     For();
   else if (IsLexeme(L"while"))
     While();
+  else if (IsLexeme(L"do"))
+    DoWhile();
   else if (IsLexeme(L"foreach"))
     Foreach();
-  else if (IsLexeme(L"if") || IsLexeme(L"elif") || IsLexeme(L"else"))
+  else if (IsLexeme(L"if")) {
     If();
+    Elif();
+    Else();
+  }
   else if (IsLexeme(L"return"))
     Return();
   else if (IsLexeme(L"break"))
@@ -207,28 +215,245 @@ void Definition() {
   Expect(LexemeType::kReserved);
 }
 
-void VariableParameter();
-void VariableParameterList();
-void DefaultParameter();
-void DefaultParameterList();
-void LambdaFunction();
-void Function();
-void Type();
-void TypeNoConst();
-void If();
-void Else();
-void For();
-void Foreach();
-void While();
-void DoWhile();
-void Try();
-void Throw();
-void Continue();
-void Break();
-void Return();
-void FunctionCall();
-void Priority0();
-void Sign0();
+void VariableParameter() {
+  Type();
+  VariableIdentifier();
+}
+
+void VariableParameterList() {
+  VariableParameter();
+  while (IsLexeme(LexemeType::kPunctuation, L",")) {
+    GetNext();
+    VariableParameter();
+  }
+}
+
+void DefaultParameter() {
+  VariableParameter();
+  Expect(LexemeType::kOperator, L"=");
+  GetNext();
+  Expression();
+}
+
+void DefaultParameterList() {
+  DefaultParameter();
+  while (IsLexeme(LexemeType::kPunctuation, L",")) {
+    GetNext();
+    DefaultParameter();
+  }
+}
+
+void ParameterList() {
+  // Походу, с такой реализацией, 3 верхних функции не нужны
+  // Иначе я не смог придумать, как реализовать спуск без больших костылей
+  // Я их пока не стал удалять - мало ли...
+
+  bool startedDefault = false;
+
+  VariableParameter();
+  if (IsLexeme(LexemeType::kOperator, L"=")) {
+    startedDefault = true;
+    GetNext();
+    Expression();
+  }
+
+  while (IsLexeme(LexemeType::kPunctuation, L",")) {
+    GetNext();
+    VariableParameter();
+    if (IsLexeme(LexemeType::kOperator, L"=")) {
+      startedDefault = true;
+    }
+    if (startedDefault) {
+      Expect(LexemeType::kOperator, L"=");
+      GetNext();
+      Expression();
+    }
+  }
+}
+
+void LambdaFunction(); // TODO: think...
+
+void Function() {
+  Type();
+  Expect(LexemeType::kIdentifier);
+  GetNext();
+  Expect(LexemeType::kParenthesis, L"(");
+  GetNext();
+  ParameterList();
+  Expect(LexemeType::kParenthesis, L")");
+  GetNext();
+  Block();
+}
+
+void Type() {
+  if (IsLexeme(LexemeType::kReserved, L"const")) {
+    GetNext();
+  }
+  TypeNoConst();
+  if (IsLexeme(LexemeType::kOperator, L"&")) {
+    GetNext();
+  }
+}
+
+void TypeNoConst() {
+  Expect(LexemeType::kVariableType);
+}
+
+void If() {
+  Expect(LexemeType::kReserved, L"if");
+  GetNext();
+  Expect(LexemeType::kParenthesis, L"(");
+  GetNext();
+  Expression();
+  Expect(LexemeType::kParenthesis, L")");
+  GetNext();
+  Block();
+}
+
+void Elif() {
+  while (IsLexeme(LexemeType::kReserved, L"elif")) {
+    GetNext();
+    Expect(LexemeType::kParenthesis, L"(");
+    GetNext();
+    Expression();
+    Expect(LexemeType::kParenthesis, L")");
+    GetNext();
+    Block();
+  }
+}
+
+void Else() {
+  if (IsLexeme(LexemeType::kReserved, L"else")) {
+    GetNext();
+    Block();
+  }
+}
+
+void For() {
+  Expect(LexemeType::kReserved, L"for");
+  GetNext();
+  Expect(LexemeType::kParenthesis, L"(");
+  GetNext();
+  EpsExpression();
+  Expect(LexemeType::kPunctuation, L";");
+  GetNext();
+  Expression();
+  Expect(LexemeType::kPunctuation, L";");
+  GetNext();
+  EpsExpression();
+  Expect(LexemeType::kParenthesis, L")");
+  GetNext();
+  Block();
+}
+
+void Foreach() {
+  Expect(LexemeType::kReserved, L"foreach");
+  GetNext();
+  Expect(LexemeType::kParenthesis, L"(");
+  GetNext();
+  VariableParameter();
+  Expect(LexemeType::kReserved, L"of");
+  GetNext();
+  Expression();
+  Expect(LexemeType::kParenthesis, L")");
+  GetNext();
+  Block();
+}
+
+void While() {
+  Expect(LexemeType::kReserved, L"while");
+  GetNext();
+  Expect(LexemeType::kParenthesis, L"(");
+  GetNext();
+  Expression();
+  Expect(LexemeType::kParenthesis, L")");
+  GetNext();
+  Block();
+}
+
+void DoWhile() {
+  Expect(LexemeType::kReserved, L"do");
+  GetNext();
+  Block();
+  Expect(LexemeType::kParenthesis, L"(");
+  GetNext();
+  Expect(LexemeType::kReserved, L"while");
+  GetNext();
+  Expression();
+  Expect(LexemeType::kParenthesis, L")");
+  GetNext();
+  Expect(LexemeType::kPunctuation, L";");
+  GetNext();
+}
+
+void Try() {
+  Expect(LexemeType::kReserved, L"try");
+  GetNext();
+  Block();
+  Expect(LexemeType::kReserved, L"catch");
+  GetNext();
+  Expect(LexemeType::kParenthesis, L"(");
+  GetNext();
+  VariableParameter();
+  Expect(LexemeType::kParenthesis, L")");
+  GetNext();
+  Block();
+  while (IsLexeme(LexemeType::kReserved, L"catch")) {
+    GetNext();
+    Expect(LexemeType::kParenthesis, L"(");
+    GetNext();
+    VariableParameter();
+    Expect(LexemeType::kParenthesis, L")");
+    GetNext();
+    Block();
+  }
+}
+
+void Throw() {
+  Expect(LexemeType::kReserved, L"throw");
+  GetNext();
+  Expression();
+  Expect(LexemeType::kPunctuation, L";");
+  GetNext();
+}
+
+void Continue() {
+  Expect(LexemeType::kReserved, L"continue");
+  GetNext();
+  Expect(LexemeType::kPunctuation, L";");
+  GetNext();
+}
+
+void Break() {
+  Expect(LexemeType::kReserved, L"break");
+  GetNext();
+  Expect(LexemeType::kPunctuation, L";");
+  GetNext();
+}
+
+void Return() {
+  Expect(LexemeType::kReserved, L"return");
+  GetNext();
+  Expression();
+  Expect(LexemeType::kPunctuation, L";");
+  GetNext();
+}
+
+void FunctionCall() {
+  Identifier();
+  Expect(LexemeType::kParenthesis, L"(");
+  GetNext();
+  if (!IsLexeme(LexemeType::kParenthesis, L")")) {
+    Expression();
+    while (IsLexeme(LexemeType::kPunctuation, L",")) {
+      GetNext();
+      Expression();
+    }
+  }
+  Expect(LexemeType::kParenthesis, L")");
+  GetNext();
+}
+
 void Priority1();
 void Sign1();
 void Priority2();
