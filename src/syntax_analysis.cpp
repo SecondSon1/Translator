@@ -69,6 +69,7 @@ void Function();
 void Type();
 void TypeNoConst();
 void If();
+void Elif();
 void Else();
 void For();
 void Foreach();
@@ -175,7 +176,7 @@ void Expression() {
     GetNext();
     return;
   }
-  Priority0();
+  Priority1();
 }
 
 void EpsExpression() {
@@ -440,7 +441,8 @@ void Return() {
 }
 
 void FunctionCall() {
-  Identifier();
+  Expect(LexemeType::kIdentifier);
+  GetNext();
   Expect(LexemeType::kParenthesis, L"(");
   GetNext();
   if (!IsLexeme(LexemeType::kParenthesis, L")")) {
