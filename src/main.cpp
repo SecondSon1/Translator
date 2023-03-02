@@ -4,6 +4,8 @@
 
 #include "lexeme.hpp"
 #include "lexical_analyzer.hpp"
+#include "syntax_analysis.hpp"
+#include "exceptions.hpp"
 
 int32_t main() {
 
@@ -14,23 +16,25 @@ int32_t main() {
     code.push_back(L'\n');
   }
 
-  std::wcout << L"Lexemes:" << std::endl;
-  auto x = GetLexemeStrings();
-  for (auto [k, v] : x) {
-    std::wcout << ToString(k) << L":";
-    for (auto y : v)
-      std::wcout << L" " << y;
-    std::wcout << std::endl;
-  }
-  std::wcout << std::endl;
-  
-
-  std::wcout << code << std::endl;
-  std::wcout << "Lexical analysis:" << std::endl;
   auto z = PerformLexicalAnalysis(code);
-  std::wcout << std::endl;
+
+  int index = -11;
+  try {
+    PerformSyntaxAnalysis(z);
+  } catch (SyntaxAnalysisError & e) {
+    index = e.GetIndex();
+    std::wcout << L"Error at syntax analysis at lexeme " << e.GetIndex() << std::endl;
+    std::wcout << L"Expected: " << ToString(e.GetExpected()) << L", got "
+                << ToString(z[e.GetIndex()].GetType()) << std::endl;
+  }
+
+  int i = 0;
   for (auto lexeme : z) {
-    std::wcout << lexeme << std::endl;
+    if (i == index)
+      std::wcout << "> ";
+    if (index - 10 <= i && i <= index + 10)
+      std::wcout << i << ": " << lexeme << std::endl;
+    ++i;
   }
 
   return 0;

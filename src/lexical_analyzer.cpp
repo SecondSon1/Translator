@@ -23,15 +23,16 @@ bool IsDigit(wchar_t ch, bool is_hex) {
 
 std::vector<Lexeme> PerformLexicalAnalysis(const std::wstring & code) {
 
-  static std::vector<std::wstring> reserved;
+  static std::vector<std::pair<std::wstring, LexemeType>> identifier_overrides;
   static std::vector<std::vector<std::pair<std::wstring, LexemeType>>> by_length;
 
   if (by_length.empty()) {
 
     std::map<LexemeType, std::vector<std::wstring>> lexeme_strings = GetLexemeStrings();
     for (const auto & [type, vec] : lexeme_strings) {
-      if (type == LexemeType::kReserved) {
-        reserved = vec;
+      if (type == LexemeType::kReserved || type == LexemeType::kVariableType) {
+        for (const std::wstring & str : vec)
+          identifier_overrides.emplace_back(str, type);
         continue;
       }
       for (const std::wstring & str : vec) {
@@ -82,17 +83,14 @@ std::vector<Lexeme> PerformLexicalAnalysis(const std::wstring & code) {
       while (j < code.size() && (std::isalpha(code[j]) || code[j] == L'_' || std::isdigit(code[j]))) {
         str.push_back(code[j++]);
       }
-      bool kw = false;
-      for (const std::wstring & reserved_word : reserved) {
-        if (str == reserved_word) {
-          kw = true;
+      LexemeType resulting_type = LexemeType::kIdentifier;
+      for (const std::pair<std::wstring, LexemeType> & ovd : identifier_overrides) {
+        if (str == ovd.first) {
+          resulting_type = ovd.second;
           break;
         }
       }
-      if (kw)
-        result.emplace_back(LexemeType::kReserved, str);
-      else
-        result.emplace_back(LexemeType::kIdentifier, str);
+      result.emplace_back(resulting_type, str);
 
     } else if (std::isdigit(code[i])) {                           // numeric literal
 
@@ -144,8 +142,8 @@ std::vector<Lexeme> PerformLexicalAnalysis(const std::wstring & code) {
             j = i + len;
             break;
           }
-          if (found) break;
         }
+        if (found) break;
       }
       if (!found) {
         result.emplace_back(LexemeType::kUnknown, str);

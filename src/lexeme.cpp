@@ -3,12 +3,12 @@
 std::map<LexemeType, std::vector<std::wstring>> GetLexemeStrings() {
   std::map<LexemeType, std::vector<std::wstring>> ans;
   ans[LexemeType::kReserved] = {
-    L"for", L"while", L"do", L"foreach", L"of", L"if", L"elif", L"else", L"return", L"break", L"continue", L"struct"
+    L"for", L"while", L"do", L"foreach", L"of", L"if", L"elif", L"else", L"return", L"break", L"continue", L"struct", L"const"
   };
   ans[LexemeType::kOperator] = {
     L"+", L"-", L"*", L"/", L"%", L"++", L"--", L"&", L"|", L"^", L"&&", L"||", L"==", L"!=",
     L"<", L">", L"<=", L">=", L"<<", L">>", L"=", L"+=", L"-=", L"*=", L"/=", L"%=",
-    L"<<=", L">>=", L"&=", L"^=", L"|=", L"."
+    L"<<=", L">>=", L"&=", L"^=", L"|=", L".", L"**", L"**="
   };
   ans[LexemeType::kPunctuation] = {
     L",", L";", L"{", L"}"
@@ -20,7 +20,7 @@ std::map<LexemeType, std::vector<std::wstring>> GetLexemeStrings() {
     L"[", L"]"
   };
   ans[LexemeType::kVariableType] = {
-    L"int8", L"int16", L"int32", L"int64", L"uint8", L"uint16", L"uint32", L"uint64", L"f32", L"f64", L"string", L"var"
+    L"int8", L"int16", L"int32", L"int64", L"uint8", L"uint16", L"uint32", L"uint64", L"f32", L"f64", L"string", L"var", L"void"
   };
   return ans;
 }

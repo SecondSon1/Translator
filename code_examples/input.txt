@@ -1,5 +1,33 @@
+const int32 N = 1 << 20;
+int32 segm[N * 2];
+void Build() {
+  for (int32 i = 0; i < N; ++i) {
+    segm[i + N] = i;
+  }
+  for (int32 i = N-1; i > 0; --i) {
+    segm[i] = min(segm[i << 1], segm[i << 1 | 1]);
+  }
+}
+
+int32 Get(int32 l, int32 r, int32 v=1, int32 vl=0, int32 vr=N) {
+  if (l >= vr || vl >= r) { return INF; }
+  if (l <= vl && vr <= r) { return segm[v]; }
+  int32 vm = (vl + vr) >> 1;
+  return min(Get(l, r, v << 1, vl, vm), Get(l, r, v << 1 | 1, vm, vr));
+}
+
+void Update(int32 ind, int32 val, int32 v=1, int32 vl=0, int32 vr=N) {
+  if (vr - vl == 1) { segm[v] = val; }
+  else {
+    int32 vm = (vl + vr) >> 1;
+    if (ind < vm) { Update(ind, val, v << 1, vl, vm); }
+    else { Update(ind, val, v << 1 | 1, vm, vr); }
+    segm[v] = min(segm[v << 1], segm[v << 1 | 1]);
+  }
+}
+
 int32 main() {
-  f32 x = .0;
+  f32 x = 2.0;
   cout << "yo \"mr. white\"\\" << endl;
   return 0;
 }
