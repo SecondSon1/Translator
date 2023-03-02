@@ -53,7 +53,6 @@ bool IsLexeme(const std::wstring & value) {
 void Action();
 void Block();
 void Keyword();
-void Assignment();
 void Expression();
 void Struct();
 void VariableIdentifier();
@@ -69,7 +68,6 @@ void Function();
 void Type();
 void TypeNoConst();
 void If();
-void Elif();
 void Else();
 void For();
 void Foreach();
@@ -82,37 +80,21 @@ void Break();
 void Return();
 void FunctionCall();
 void Priority1();
-void Sign1();
 void Priority2();
-void Sign2();
 void Priority3();
-void Sign3();
 void Priority4();
-void Sign4();
 void Priority5();
-void Sign5();
 void Priority6();
-void Sign6();
 void Priority7();
-void Sign7();
 void Priority8();
-void Sign8();
 void Priority9();
-void Sign9();
 void Priority10();
-void Sign10();
 void Priority11();
-void Sign11();
 void Priority12();
-void Sign12();
 void Priority13();
-void Sign13();
 void Priority14();
-void Sign14();
 void Priority15();
-void Sign15();
 void Priority16();
-void Sign16();
 
 
 
@@ -171,12 +153,7 @@ void Keyword() {
 }
 
 void Expression() {
-  if (IsLexeme(LexemeType::kIdentifier) || IsLexeme(LexemeType::kNumericLiteral)
-        || IsLexeme(LexemeType::kStringLiteral)) {
-    GetNext();
-    return;
-  }
-  Priority1();
+  Priority0();
 }
 
 void EpsExpression() {
@@ -441,8 +418,7 @@ void Return() {
 }
 
 void FunctionCall() {
-  Expect(LexemeType::kIdentifier);
-  GetNext();
+  Identifier();
   Expect(LexemeType::kParenthesis, L"(");
   GetNext();
   if (!IsLexeme(LexemeType::kParenthesis, L")")) {
@@ -456,35 +432,169 @@ void FunctionCall() {
   GetNext();
 }
 
-void Priority1();
-void Sign1();
-void Priority2();
-void Sign2();
-void Priority3();
-void Sign3();
-void Priority4();
-void Sign4();
-void Priority5();
-void Sign5();
-void Priority6();
-void Sign6();
-void Priority7();
-void Sign7();
-void Priority8();
-void Sign8();
-void Priority9();
-void Sign9();
-void Priority10();
-void Sign10();
-void Priority11();
-void Sign11();
-void Priority12();
-void Sign12();
-void Priority13();
-void Sign13();
-void Priority14();
-void Sign14();
-void Priority15();
-void Sign15();
-void Priority16();
-void Sign16();
+void Priority1() {
+  Priority2();
+  while (IsLexeme(LexemeType::kOperator, L"=")
+    || IsLexeme(LexemeType::kOperator, L"<<=")
+    || IsLexeme(LexemeType::kOperator, L">>=")
+    || IsLexeme(LexemeType::kOperator, L"+=")
+    || IsLexeme(LexemeType::kOperator, L"-=")
+    || IsLexeme(LexemeType::kOperator, L"*=")
+    || IsLexeme(LexemeType::kOperator, L"**=")
+    || IsLexeme(LexemeType::kOperator, L"/=")
+    || IsLexeme(LexemeType::kOperator, L"^=")
+    || IsLexeme(LexemeType::kOperator, L"&")
+    || IsLexeme(LexemeType::kOperator, L"|=")
+    || IsLexeme(LexemeType::kOperator, L"&&=")
+    || IsLexeme(LexemeType::kOperator, L"||=")
+    || IsLexeme(LexemeType::kOperator, L"%=")) {
+    GetNext();
+    Priority2();
+  }
+}
+
+void Priority2() {
+  Priority3();
+  while (IsLexeme(LexemeType::kOperator, L"&&")) {
+    GetNext();
+    Priority3();
+  }
+}
+
+void Priority3() {
+  Priority4();
+  while (IsLexeme(LexemeType::kOperator, L"||")) {
+    GetNext();
+    Priority4();
+  }
+}
+
+void Priority4() {
+  Priority5();
+  while (IsLexeme(LexemeType::kOperator, L"&")) {
+    GetNext();
+    Priority5();
+  }
+}
+
+void Priority5() {
+  Priority6();
+  while (IsLexeme(LexemeType::kOperator, L"|")) {
+    GetNext();
+    Priority6();
+  }
+}
+
+void Priority6() {
+  Priority7();
+  while (IsLexeme(LexemeType::kOperator, L"^")) {
+    GetNext();
+    Priority7();
+  }
+}
+
+void Priority7() {
+  Priority8();
+  while (IsLexeme(LexemeType::kOperator, L"==")
+    || IsLexeme(LexemeType::kOperator, L"!=")) {
+    GetNext();
+    Priority8();
+  }
+}
+
+void Priority8() {
+  Priority9();
+  while (IsLexeme(LexemeType::kOperator, L"<")
+    || IsLexeme(LexemeType::kOperator, L"<=")
+    || IsLexeme(LexemeType::kOperator, L">")
+    || IsLexeme(LexemeType::kOperator, L">=")) {
+    GetNext();
+    Priority9();
+  }
+}
+
+void Priority9() {
+  Priority10();
+  while (IsLexeme(LexemeType::kOperator, L"<<")
+    || IsLexeme(LexemeType::kOperator, L">>")) {
+    GetNext();
+    Priority10();
+  }
+}
+
+void Priority10() {
+  Priority11();
+  while (IsLexeme(LexemeType::kOperator, L"+")
+    || IsLexeme(LexemeType::kOperator, L"-")) {
+    GetNext();
+    Priority11();
+  }
+}
+
+void Priority11() {
+  Priority12();
+  while (IsLexeme(LexemeType::kOperator, L"*")
+    || IsLexeme(LexemeType::kOperator, L"/")
+    || IsLexeme(LexemeType::kOperator, L"%")) {
+    GetNext();
+    Priority12();
+  }
+}
+
+void Priority12() {
+  Priority13();
+  while (IsLexeme(LexemeType::kOperator, L"**")) {
+    GetNext();
+    Priority13();
+  }
+}
+
+void Priority13() {
+  if (IsLexeme(LexemeType::kOperator, L"!")) {
+    GetNext();
+  }
+  Priority14();
+}
+
+void Priority14() {
+  if (IsLexeme(LexemeType::kOperator, L"+")
+    || IsLexeme(LexemeType::kOperator, L"-")
+    || IsLexeme(LexemeType::kOperator, L"++")
+    || IsLexeme(LexemeType::kOperator, L"--")) {
+    GetNext();
+  }
+  Priority15();
+}
+
+
+void Priority15() {
+  Priority16();
+  if (IsLexeme(LexemeType::kOperator, L"++")
+    || IsLexeme(LexemeType::kOperator, L"--")) {
+    GetNext();
+  }
+  else if (IsLexeme(LexemeType::kBracket, L"[")) {
+    GetNext();
+    Expression();
+    Expect(LexemeType::kBracket, L"]");
+    GetNext();
+  }
+  else if (IsLexeme(LexemeType::kOperator, L".")) {
+    GetNext();
+    Priority16();
+  }
+}
+void Priority16() {
+  if (IsLexeme(LexemeType::kNumericLiteral)
+    || IsLexeme(LexemeType::kIdentifier)
+    || IsLexeme(LexemeType::kStringLiteral)) {
+    GetNext();
+  }
+  else {
+    Expect(LexemeType::kParenthesis, L"(")
+    GetNext();
+    Expression();
+    Expect(LexemeType::kParenthesis, L")");
+    GetNext();
+  }
+}
