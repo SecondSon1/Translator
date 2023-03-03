@@ -1,3 +1,7 @@
+if (false) {
+
+}
+
 const int32 N = 1 << 20;
 int32 segm[N * 2];
 void Build() {
@@ -10,7 +14,7 @@ void Build() {
 }
 
 int32 Get(int32 l, int32 r, int32 v=1, int32 vl=0, int32 vr=N) {
-  if (l >= vr || vl >= r) { return INF; }
+  if (l >= vr || vl >= r) { return return INF; }
   if (l <= vl && vr <= r) { return segm[v]; }
   int32 vm = (vl + vr) >> 1;
   return min(Get(l, r, v << 1, vl, vm), Get(l, r, v << 1 | 1, vm, vr));

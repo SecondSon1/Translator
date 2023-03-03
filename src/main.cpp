@@ -18,23 +18,38 @@ int32_t main() {
 
   auto z = PerformLexicalAnalysis(code);
 
-  int index = -11;
   try {
     PerformSyntaxAnalysis(z);
+    std::wcout << L"Syntax Analysis: OK" << std::endl;
   } catch (SyntaxAnalysisError & e) {
-    index = e.GetIndex();
-    std::wcout << L"Error at syntax analysis at lexeme " << e.GetIndex() << std::endl;
-    std::wcout << L"Expected: " << ToString(e.GetExpected()) << L", got "
-                << ToString(z[e.GetIndex()].GetType()) << std::endl;
-  }
+    std::wcout << L"Syntax Analysis: Error" << std::endl;
+    size_t index = z[e.GetIndex()].GetIndex();
+    if (e.GetIndex() == z.size()) {
+      --index;
+      std::wcout << L"Expected: " << ToString(e.GetExpected()) << L", got: EOF" << std::endl;
+    } else {
+      std::wcout << L"Expected: " << ToString(e.GetExpected()) << L", got: " << ToString(z[e.GetIndex()].GetType()) << std::endl;
+    }
+    size_t cnt = 0;
+    std::wstring prev;
+    for (size_t i = 0; cnt <= index; ++i) {
+      line.clear();
+      for (; i < code.size() && code[i] != L'\n'; ++i) {
+        line.push_back(code[i]);
+      }
+      if (cnt + line.size() > index) {
+        std::wcout << std::endl;
+        if (!prev.empty())
+          std::wcout << prev << std::endl;
+        std::wcout << line << std::endl;
+        index -= cnt;
+        break;
+      } else cnt += line.size() + 1;
+      prev = line;
+    }
+    while (index-- > 0) std::wcout << L' ';
+    std::wcout << "^" << std::endl;
 
-  int i = 0;
-  for (auto lexeme : z) {
-    if (i == index)
-      std::wcout << "> ";
-    if (index - 10 <= i && i <= index + 10)
-      std::wcout << i << ": " << lexeme << std::endl;
-    ++i;
   }
 
   return 0;

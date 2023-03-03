@@ -90,7 +90,7 @@ std::vector<Lexeme> PerformLexicalAnalysis(const std::wstring & code) {
           break;
         }
       }
-      result.emplace_back(resulting_type, str);
+      result.emplace_back(resulting_type, str, i);
 
     } else if (std::isdigit(code[i])) {                           // numeric literal
 
@@ -110,7 +110,7 @@ std::vector<Lexeme> PerformLexicalAnalysis(const std::wstring & code) {
         while (j < code.size() && std::isdigit(code[j]))
           str.push_back(code[j++]);
       }
-      result.emplace_back(LexemeType::kNumericLiteral, str);
+      result.emplace_back(LexemeType::kNumericLiteral, str, i);
 
     } else if (code[i] == L'"' || code[i] == L'\'') {
 
@@ -129,7 +129,7 @@ std::vector<Lexeme> PerformLexicalAnalysis(const std::wstring & code) {
 
       if (j >= code.size() || code[j] == L'\n')
         throw StringNotEndedError(j);
-      result.emplace_back(LexemeType::kStringLiteral, str);
+      result.emplace_back(LexemeType::kStringLiteral, str, i);
       ++j;
     } else {
 
@@ -138,7 +138,7 @@ std::vector<Lexeme> PerformLexicalAnalysis(const std::wstring & code) {
         for (const auto & [word, type] : by_length[len]) {
           if (Fits(code, i, word)) {
             found = true;
-            result.emplace_back(type, word);
+            result.emplace_back(type, word, i);
             j = i + len;
             break;
           }
@@ -146,7 +146,7 @@ std::vector<Lexeme> PerformLexicalAnalysis(const std::wstring & code) {
         if (found) break;
       }
       if (!found) {
-        result.emplace_back(LexemeType::kUnknown, str);
+        result.emplace_back(LexemeType::kUnknown, str, i);
       }
 
     }

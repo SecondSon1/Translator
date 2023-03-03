@@ -19,11 +19,11 @@ bool eof;
 Lexeme lexeme;
 
 void GetNext() {
-  if (_lexeme_index + 1 == _lexemes.size()) {
+  _lexeme_index++;
+  if (_lexeme_index == _lexemes.size())
     eof = true;
-  } else {
-    lexeme = _lexemes[++_lexeme_index];
-  }
+  else
+    lexeme = _lexemes[_lexeme_index];
 }
 
 void Program();
@@ -150,6 +150,10 @@ void Action() {
 
 void Block() {
   debug("Block");
+  if (!IsLexeme(LexemeType::kPunctuation, L"{")) {
+    Action();
+    return;
+  }
   Expect(LexemeType::kPunctuation, L"{");
   GetNext();
   Program();
@@ -347,10 +351,12 @@ void TypeNoConst() {
 }
 
 void If() {
+  debug("If");
   Expect(LexemeType::kReserved, L"if");
   GetNext();
   Expect(LexemeType::kParenthesis, L"(");
   GetNext();
+  debug("lol");
   Expression();
   Expect(LexemeType::kParenthesis, L")");
   GetNext();
@@ -667,7 +673,8 @@ void Priority15() {
 void Priority16() {
   if (IsLexeme(LexemeType::kNumericLiteral)
     || IsLexeme(LexemeType::kIdentifier)
-    || IsLexeme(LexemeType::kStringLiteral)) {
+    || IsLexeme(LexemeType::kStringLiteral)
+    || IsLexeme(LexemeType::kReserved, L"true") || IsLexeme(LexemeType::kReserved, L"false")) {
     GetNext();
   }
   else {

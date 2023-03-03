@@ -3,7 +3,8 @@
 std::map<LexemeType, std::vector<std::wstring>> GetLexemeStrings() {
   std::map<LexemeType, std::vector<std::wstring>> ans;
   ans[LexemeType::kReserved] = {
-    L"for", L"while", L"do", L"foreach", L"of", L"if", L"elif", L"else", L"return", L"break", L"continue", L"struct", L"const"
+    L"for", L"while", L"do", L"foreach", L"of", L"if", L"elif", L"else", L"return", L"break", L"continue",
+    L"struct", L"const", L"true", L"false"
   };
   ans[LexemeType::kOperator] = {
     L"+", L"-", L"*", L"/", L"%", L"++", L"--", L"&", L"|", L"^", L"&&", L"||", L"==", L"!=",
