@@ -1,20 +1,43 @@
 #include <iostream>
 #include <cstdlib>
 #include <string>
+#include <fstream>
 
 #include "lexeme.hpp"
 #include "lexical_analyzer.hpp"
 #include "syntax_analysis.hpp"
 #include "exceptions.hpp"
+#include "terminal_colors.hpp"
 
-int32_t main() {
+void PrintHelp() {
+	// TODO
+	std::cout << "Example help" << std::endl;
+	return;
+}
+
+int32_t main(const int argc, const char *argv[]) {
+  // Maybe it's better to create ParceArgs function
+  // Or to do it in another file
+  // I don't wanna to think too much
+  if (argc < 2) {
+      PrintHelp();
+      return 0;
+  }
+
+  std::wifstream codeFile;
+  codeFile.open(argv[1]);
+  if (!codeFile.is_open()) {
+	std::cout << color::red << "Cannot open file " << color::reset << argv[1] << std::endl;
+	return 1;
+  }
 
   std::wstring code;
   std::wstring line;
-  while (std::getline(std::wcin, line)) {
+  while (std::getline(codeFile, line)) {
     code += line;
     code.push_back(L'\n');
   }
+  codeFile.close();
 
   auto z = PerformLexicalAnalysis(code);
 
