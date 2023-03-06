@@ -10,7 +10,7 @@ LIBFLAGS=
 CCFLAGS = -std=c++17 -Wextra -Wshadow -Wconversion -Wfloat-equal -O2
 CCFLAGS += -fsanitize=undefined,bounds,address
 
-all: dirs build
+all: build
 
 dirs:
 	mkdir -p ./$(BIN)
@@ -18,10 +18,10 @@ dirs:
 %.o: %.cpp
 	$(CC) -o $@ -c $< $(INCFLAGS) $(CCFLAGS)
 
-build: dirs $(OBJ)
+build: clean dirs $(OBJ)
 	$(CC) -o $(BIN)/app $(filter %.o,$^) -lm $(LIBFLAGS) $(CCFLAGS)
 
-run: dirs build
+run: build
 	$(BIN)/app
 
 clean:
