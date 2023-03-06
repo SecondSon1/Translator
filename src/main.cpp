@@ -44,7 +44,6 @@ int32_t main(const int argc, const char *argv[]) {
   try {
     PerformSyntaxAnalysis(z);
   } catch (std::vector<SyntaxAnalysisError> & errors) {
-      std::wcout << errors.size();
       for (auto e : errors) {
           size_t index;
           if (e.GetIndex() == z.size())
@@ -88,7 +87,7 @@ int32_t main(const int argc, const char *argv[]) {
           std::wcout << std::endl << std::endl;
       }
 
-      std::wcout << color::red << color::bright << errors.size() << color::reset << " error was found" << std::endl;
+      std::wcout << color::red << color::bright << errors.size() << color::reset << " error" << (errors.size() == 1 ? "" : "s") <<  " was found" << std::endl;
       return 2;
   }
 
