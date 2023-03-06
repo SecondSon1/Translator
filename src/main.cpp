@@ -46,9 +46,11 @@ int32_t main(const int argc, const char *argv[]) {
   } catch (std::vector<SyntaxAnalysisError> & errors) {
       std::wcout << errors.size();
       for (auto e : errors) {
-          size_t index = z[e.GetIndex()].GetIndex();
-
-          std::wcout << index;
+          size_t index;
+          if (e.GetIndex() == z.size())
+              index = z[e.GetIndex() - 1].GetIndex() + z[e.GetIndex() - 1].GetValue().size() + 1;
+          else
+              index = z[e.GetIndex()].GetIndex();
 
           // Getting lexeme position in file
           size_t lineIndex = 1, columnIndex = 0, lineStartIndex;
@@ -69,7 +71,6 @@ int32_t main(const int argc, const char *argv[]) {
               std::wcout << "expected: " << color::cyan << ToString(e.GetExpected()) << color::reset;
               std::wcout << color::bright << ", got: " << color::red << "EOF" << color::reset;
               std::wcout << color::bright << ')' << color::reset << std::endl;
-              --index;
           } else {
               std::wcout << color::bright << " (";
               std::wcout << "expected: " << color::cyan << ToString(e.GetExpected()) << color::reset;
@@ -87,9 +88,9 @@ int32_t main(const int argc, const char *argv[]) {
           std::wcout << std::endl << std::endl;
       }
 
-    std::wcout << color::red << color::bright << errors.size() << color::reset << " error was found" << std::endl;
-    return 2;
-  } catch (...) {return 0;}
+      std::wcout << color::red << color::bright << errors.size() << color::reset << " error was found" << std::endl;
+      return 2;
+  }
 
   std::wcout << color::green << color::bright << '0' << color::reset << " errors were found" << std::endl;
   return 0;
