@@ -75,13 +75,13 @@ int32_t main(const int argc, const char *argv[]) {
 
     // Printing line with error
     for (size_t i = lineStartIndex; i < code.size() && code[i] != '\n'; ++i) {
-        if (i == index) std::wcout << color::red << color::underline;
+        if (i == index) std::wcout << color::background::red << color::white;
         else if (i == index + z[e.GetIndex()].GetValue().size()) std::wcout << color::reset;
         std::wcout << code[i];
     }
     std::wcout << std::endl << std::endl;
 
-    std::wcout << color::red << color::bright << '1' << color::reset << " error was found" << std::endl;
+    std::wcout <<   color::red << color::bright << '1' << color::reset << " error was found" << std::endl;
     return 2;
   }
 

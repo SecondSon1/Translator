@@ -64,42 +64,42 @@ namespace color {
     // Background colors
     namespace background {
         std::wostream &black(std::wostream &out) {
-            out << "\033[30m";
+            out << "\033[40m";
             return out;
         }
 
         std::wostream &red(std::wostream &out) {
-            out << "\033[31m";
+            out << "\033[41m";
             return out;
         }
 
         std::wostream &green(std::wostream &out) {
-            out << "\033[32m";
+            out << "\033[42m";
             return out;
         }
 
         std::wostream &yellow(std::wostream &out) {
-            out << "\033[33m";
+            out << "\033[43m";
             return out;
         }
 
         std::wostream &blue(std::wostream &out) {
-            out << "\033[34m";
+            out << "\033[44m";
             return out;
         }
 
         std::wostream &purple(std::wostream &out) {
-            out << "\033[35m";
+            out << "\033[45m";
             return out;
         }
 
         std::wostream &cyan(std::wostream &out) {
-            out << "\033[36m";
+            out << "\033[46m";
             return out;
         }
 
         std::wostream &white(std::wostream &out) {
-            out << "\033[37m";
+            out << "\033[47m";
             return out;
         }
     }
