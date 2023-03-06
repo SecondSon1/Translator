@@ -11,7 +11,7 @@
 
 void PrintHelp() {
 	// TODO
-	std::wcout << L"Example help" << std::endl;
+	std::wcout << "Example help" << std::endl;
 	return;
 }
 
@@ -27,7 +27,7 @@ int32_t main(const int argc, const char *argv[]) {
   std::wifstream codeFile;
   codeFile.open(argv[1]);
   if (!codeFile.is_open()) {
-	std::wcout << color::red << "Cannot open file " << color::reset << argv[1] << std::endl;
+	std::wcout << color::bright << color::red << "Cannot open file " << color::reset << argv[1] << std::endl;
 	return 1;
   }
 
@@ -76,8 +76,8 @@ int32_t main(const int argc, const char *argv[]) {
     // Printing line with error
     for (size_t i = lineStartIndex; i < code.size() && code[i] != '\n'; ++i) {
         if (i == index) std::wcout << color::background::red << color::white;
-        else if (i == index + z[e.GetIndex()].GetValue().size()) std::wcout << color::reset;
         std::wcout << code[i];
+        if (i == index + z[e.GetIndex()].GetValue().size() - 1) std::wcout << color::reset;
     }
     std::wcout << std::endl << std::endl;
 
