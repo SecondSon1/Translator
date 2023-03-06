@@ -11,7 +11,7 @@
 
 void PrintHelp() {
 	// TODO
-	std::cout << "Example help" << std::endl;
+	std::wcout << L"Example help" << std::endl;
 	return;
 }
 
@@ -27,7 +27,7 @@ int32_t main(const int argc, const char *argv[]) {
   std::wifstream codeFile;
   codeFile.open(argv[1]);
   if (!codeFile.is_open()) {
-	std::cout << color::red << "Cannot open file " << color::reset << argv[1] << std::endl;
+	std::wcout << color::red << "Cannot open file " << color::reset << argv[1] << std::endl;
 	return 1;
   }
 
@@ -43,37 +43,48 @@ int32_t main(const int argc, const char *argv[]) {
 
   try {
     PerformSyntaxAnalysis(z);
-    std::wcout << L"Syntax Analysis: OK" << std::endl;
   } catch (SyntaxAnalysisError & e) {
-    std::wcout << L"Syntax Analysis: Error" << std::endl;
     size_t index = z[e.GetIndex()].GetIndex();
-    if (e.GetIndex() == z.size()) {
-      --index;
-      std::wcout << L"Expected: " << ToString(e.GetExpected()) << L", got: EOF" << std::endl;
-    } else {
-      std::wcout << L"Expected: " << ToString(e.GetExpected()) << L", got: " << ToString(z[e.GetIndex()].GetType()) << std::endl;
-    }
-    size_t cnt = 0;
-    std::wstring prev;
-    for (size_t i = 0; cnt <= index; ++i) {
-      line.clear();
-      for (; i < code.size() && code[i] != L'\n'; ++i) {
-        line.push_back(code[i]);
-      }
-      if (cnt + line.size() > index) {
-        std::wcout << std::endl;
-        if (!prev.empty())
-          std::wcout << prev << std::endl;
-        std::wcout << line << std::endl;
-        index -= cnt;
-        break;
-      } else cnt += line.size() + 1;
-      prev = line;
-    }
-    while (index-- > 0) std::wcout << L' ';
-    std::wcout << "^" << std::endl;
 
+    // Getting lexeme position in file
+    size_t lineIndex = 1, columnIndex = 0, lineStartIndex;
+    for (size_t i = 0; i < index; ++i, ++columnIndex) {
+        if (code[i] == '\n') {
+            columnIndex = 0;
+            ++lineIndex;
+            lineStartIndex = i + 1;
+        }
+    }
+
+    // Printing error info
+    std::wcout << color::bright << argv[1] << ':' << lineIndex << ':' << columnIndex << ": ";
+    std::wcout << color::red << "error: " << color::reset << color::bright << "unexpected lexeme" << color::reset;
+
+    if (e.GetIndex() == z.size()) {
+        std::wcout << color::bright << " (";
+        std::wcout << "expected: " << color::cyan << ToString(e.GetExpected()) << color::reset;
+        std::wcout << color::bright << ", got: " << color::red << "EOF" << color::reset;
+        std::wcout << color::bright << ')' << color::reset << std::endl;
+        --index;
+    } else {
+        std::wcout << color::bright << " (";
+        std::wcout << "expected: " << color::cyan << ToString(e.GetExpected()) << color::reset;
+        std::wcout << color::bright << ", got: " << color::red << ToString(z[e.GetIndex()].GetType()) << color::reset;
+        std::wcout << color::bright << ')' << color::reset << std::endl;
+    }
+
+    // Printing line with error
+    for (size_t i = lineStartIndex; i < code.size() && code[i] != '\n'; ++i) {
+        if (i == index) std::wcout << color::red << color::underline;
+        else if (i == index + z[e.GetIndex()].GetValue().size()) std::wcout << color::reset;
+        std::wcout << code[i];
+    }
+    std::wcout << std::endl << std::endl;
+
+    std::wcout << color::red << color::bright << '1' << color::reset << " error was found" << std::endl;
+    return 2;
   }
 
+  std::wcout << color::green << color::bright << '0' << color::reset << " errors were found" << std::endl;
   return 0;
 }
