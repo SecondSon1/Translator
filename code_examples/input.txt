@@ -32,6 +32,6 @@ void Update(int32 ind, int32 val, int32 v=1, int32 vl=0, int32 vr=N) {
 
 int32 main() {
   f32 x = 2.0;
-  cout << "yo \"mr. white\"\\" << endl;
+  cout << "yo /*\"mr. white\"\\" << endl;
   return 0;
 }

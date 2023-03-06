@@ -1,12 +1,12 @@
-#include <iostream>
 #include <cstdlib>
-#include <string>
 #include <fstream>
+#include <iostream>
+#include <string>
 
+#include "exceptions.hpp"
 #include "lexeme.hpp"
 #include "lexical_analyzer.hpp"
 #include "syntax_analysis.hpp"
-#include "exceptions.hpp"
 #include "terminal_colors.hpp"
 
 void PrintHelp() {
@@ -43,47 +43,53 @@ int32_t main(const int argc, const char *argv[]) {
 
   try {
     PerformSyntaxAnalysis(z);
-  } catch (SyntaxAnalysisError & e) {
-    size_t index = z[e.GetIndex()].GetIndex();
+  } catch (std::vector<SyntaxAnalysisError> & errors) {
+      std::wcout << errors.size();
+      for (auto e : errors) {
+          size_t index = z[e.GetIndex()].GetIndex();
 
-    // Getting lexeme position in file
-    size_t lineIndex = 1, columnIndex = 0, lineStartIndex;
-    for (size_t i = 0; i < index; ++i, ++columnIndex) {
-        if (code[i] == '\n') {
-            columnIndex = 0;
-            ++lineIndex;
-            lineStartIndex = i + 1;
-        }
-    }
+          std::wcout << index;
 
-    // Printing error info
-    std::wcout << color::bright << argv[1] << ':' << lineIndex << ':' << columnIndex << ": ";
-    std::wcout << color::red << "error: " << color::reset << color::bright << "unexpected lexeme" << color::reset;
+          // Getting lexeme position in file
+          size_t lineIndex = 1, columnIndex = 0, lineStartIndex;
+          for (size_t i = 0; i < index; ++i, ++columnIndex) {
+              if (code[i] == '\n') {
+                  columnIndex = 0;
+                  ++lineIndex;
+                  lineStartIndex = i + 1;
+              }
+          }
 
-    if (e.GetIndex() == z.size()) {
-        std::wcout << color::bright << " (";
-        std::wcout << "expected: " << color::cyan << ToString(e.GetExpected()) << color::reset;
-        std::wcout << color::bright << ", got: " << color::red << "EOF" << color::reset;
-        std::wcout << color::bright << ')' << color::reset << std::endl;
-        --index;
-    } else {
-        std::wcout << color::bright << " (";
-        std::wcout << "expected: " << color::cyan << ToString(e.GetExpected()) << color::reset;
-        std::wcout << color::bright << ", got: " << color::red << ToString(z[e.GetIndex()].GetType()) << color::reset;
-        std::wcout << color::bright << ')' << color::reset << std::endl;
-    }
+          // Printing error info
+          std::wcout << color::bright << argv[1] << ':' << lineIndex << ':' << columnIndex << ": ";
+          std::wcout << color::red << "error: " << color::reset << color::bright << "unexpected lexeme" << color::reset;
 
-    // Printing line with error
-    for (size_t i = lineStartIndex; i < code.size() && code[i] != '\n'; ++i) {
-        if (i == index) std::wcout << color::background::red << color::white;
-        std::wcout << code[i];
-        if (i == index + z[e.GetIndex()].GetValue().size() - 1) std::wcout << color::reset;
-    }
-    std::wcout << std::endl << std::endl;
+          if (e.GetIndex() == z.size()) {
+              std::wcout << color::bright << " (";
+              std::wcout << "expected: " << color::cyan << ToString(e.GetExpected()) << color::reset;
+              std::wcout << color::bright << ", got: " << color::red << "EOF" << color::reset;
+              std::wcout << color::bright << ')' << color::reset << std::endl;
+              --index;
+          } else {
+              std::wcout << color::bright << " (";
+              std::wcout << "expected: " << color::cyan << ToString(e.GetExpected()) << color::reset;
+              std::wcout << color::bright << ", got: " << color::red << ToString(z[e.GetIndex()].GetType())
+                         << color::reset;
+              std::wcout << color::bright << ')' << color::reset << std::endl;
+          }
 
-    std::wcout <<   color::red << color::bright << '1' << color::reset << " error was found" << std::endl;
+          // Printing line with error
+          for (size_t i = lineStartIndex; i < code.size() && code[i] != '\n'; ++i) {
+              if (i == index) std::wcout << color::background::red << color::white;
+              std::wcout << code[i];
+              if (i == index + z[e.GetIndex()].GetValue().size() - 1) std::wcout << color::reset;
+          }
+          std::wcout << std::endl << std::endl;
+      }
+
+    std::wcout << color::red << color::bright << errors.size() << color::reset << " error was found" << std::endl;
     return 2;
-  }
+  } catch (...) {return 0;}
 
   std::wcout << color::green << color::bright << '0' << color::reset << " errors were found" << std::endl;
   return 0;

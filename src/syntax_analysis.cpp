@@ -1,6 +1,8 @@
-#include "syntax_analysis.hpp"
 #include "exceptions.hpp"
 #include "lexeme.hpp"
+#include "syntax_analysis.hpp"
+
+#include <iostream>
 
 #define DEBUG_ACTIVE 0
 
@@ -17,10 +19,11 @@ std::vector<Lexeme> _lexemes;
 size_t _lexeme_index;
 bool eof;
 Lexeme lexeme;
+std::vector<SyntaxAnalysisError> errors;
 
 void GetNext() {
   _lexeme_index++;
-  if (_lexeme_index == _lexemes.size())
+  if (_lexeme_index >= _lexemes.size())
     eof = true;
   else
     lexeme = _lexemes[_lexeme_index];
@@ -35,11 +38,14 @@ void PerformSyntaxAnalysis(const std::vector<Lexeme> & code) {
   lexeme = code[0];
   eof = false;
   Program();
+
+  if (errors.size() > 0)
+      throw errors;
 }
 
 void Expect(LexemeType type) {
   if (eof || lexeme.GetType() != type)
-    throw SyntaxAnalysisError(_lexeme_index, type);
+    errors.push_back(SyntaxAnalysisError(_lexeme_index, type));
 }
 
 void Expect(LexemeType type, LexemeType others...) {
@@ -49,7 +55,7 @@ void Expect(LexemeType type, LexemeType others...) {
 
 void Expect(LexemeType type, const std::wstring & value) {
   if (eof || lexeme.GetType() != type || lexeme.GetValue() != value)
-    throw SyntaxAnalysisError(_lexeme_index, type);
+      errors.push_back(SyntaxAnalysisError(_lexeme_index, type));
 }
 
 bool IsLexeme(LexemeType type) {
@@ -68,12 +74,8 @@ void Keyword();
 void Expression();
 void Struct();
 void VariableIdentifier();
-void VariableIdentifierList();
 void Definition();
 void VariableParameter();
-void VariableParameterList();
-void DefaultParameter();
-void DefaultParameterList();
 void ParameterList();
 void LambdaFunction();
 void Function();
@@ -134,7 +136,6 @@ void Identifiers() {
 }
 
 void Action() {
-
   debug("Action");
   if (IsLexeme(LexemeType::kReserved) || IsLexeme(LexemeType::kVariableType))
     Keyword();
@@ -268,34 +269,7 @@ void VariableParameter() {
   VariableIdentifier();
 }
 
-void VariableParameterList() {
-  VariableParameter();
-  while (IsLexeme(LexemeType::kPunctuation, L",")) {
-    GetNext();
-    VariableParameter();
-  }
-}
-
-void DefaultParameter() {
-  VariableParameter();
-  Expect(LexemeType::kOperator, L"=");
-  GetNext();
-  Expression();
-}
-
-void DefaultParameterList() {
-  DefaultParameter();
-  while (IsLexeme(LexemeType::kPunctuation, L",")) {
-    GetNext();
-    DefaultParameter();
-  }
-}
-
 void ParameterList() {
-  // Походу, с такой реализацией, 3 верхних функции не нужны
-  // Иначе я не смог придумать, как реализовать спуск без больших костылей
-  // Я их пока не стал удалять - мало ли...
-
   if (IsLexeme(LexemeType::kParenthesis, L")")) return;
 
   bool startedDefault = false;
@@ -448,23 +422,17 @@ void Try() {
   Expect(LexemeType::kReserved, L"try");
   GetNext();
   Block();
-  Expect(LexemeType::kReserved, L"catch");
-  GetNext();
-  Expect(LexemeType::kParenthesis, L"(");
-  GetNext();
-  VariableParameter();
-  Expect(LexemeType::kParenthesis, L")");
-  GetNext();
-  Block();
-  while (IsLexeme(LexemeType::kReserved, L"catch")) {
-    GetNext();
-    Expect(LexemeType::kParenthesis, L"(");
-    GetNext();
-    VariableParameter();
-    Expect(LexemeType::kParenthesis, L")");
-    GetNext();
-    Block();
+  do {
+      Expect(LexemeType::kReserved, L"catch");
+      GetNext();
+      Expect(LexemeType::kParenthesis, L"(");
+      GetNext();
+      VariableParameter();
+      Expect(LexemeType::kParenthesis, L")");
+      GetNext();
+      Block();
   }
+  while (IsLexeme(LexemeType::kReserved, L"catch"));
 }
 
 void Throw() {

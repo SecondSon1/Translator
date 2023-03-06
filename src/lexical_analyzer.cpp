@@ -1,8 +1,6 @@
-#include "lexical_analyzer.hpp"
 #include "exceptions.hpp"
 #include "lexeme.hpp"
-
-#include <iostream>
+#include "lexical_analyzer.hpp"
 
 bool Fits(const std::wstring & code, size_t index, const std::wstring & token) {
   if (index + token.size() > code.size())
