@@ -1,3 +1,5 @@
+#pragma once
+
 namespace color {
     // Formatting
     std::wostream& reset(std::wostream& out) {

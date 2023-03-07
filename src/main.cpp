@@ -3,8 +3,8 @@
 #include <string>
 #include <fstream>
 
-#include "lexeme.hpp"
 #include "lexical_analyzer.hpp"
+#include "logging.hpp"
 #include "syntax_analysis.hpp"
 #include "exceptions.hpp"
 #include "terminal_colors.hpp"
@@ -39,52 +39,18 @@ int32_t main(const int argc, const char *argv[]) {
   }
   codeFile.close();
 
-  auto z = PerformLexicalAnalysis(code);
+  auto lexemes = PerformLexicalAnalysis(code);
+
+  // For testing, you can comment this
+  log::warning(code, lexemes, 11);
 
   try {
-    PerformSyntaxAnalysis(z);
-  } catch (SyntaxAnalysisError & e) {
-    size_t index = z[e.GetIndex()].GetIndex();
-
-    // Getting lexeme position in file
-    size_t lineIndex = 1, columnIndex = 0, lineStartIndex;
-    for (size_t i = 0; i < index; ++i, ++columnIndex) {
-        if (code[i] == '\n') {
-            columnIndex = 0;
-            ++lineIndex;
-            lineStartIndex = i + 1;
-        }
-    }
-
-    // Printing error info
-    std::wcout << color::bright << argv[1] << ':' << lineIndex << ':' << columnIndex << ": ";
-    std::wcout << color::red << "error: " << color::reset << color::bright << "unexpected lexeme" << color::reset;
-
-    if (e.GetIndex() == z.size()) {
-        std::wcout << color::bright << " (";
-        std::wcout << "expected: " << color::cyan << ToString(e.GetExpected()) << color::reset;
-        std::wcout << color::bright << ", got: " << color::red << "EOF" << color::reset;
-        std::wcout << color::bright << ')' << color::reset << std::endl;
-        --index;
-    } else {
-        std::wcout << color::bright << " (";
-        std::wcout << "expected: " << color::cyan << ToString(e.GetExpected()) << color::reset;
-        std::wcout << color::bright << ", got: " << color::red << ToString(z[e.GetIndex()].GetType()) << color::reset;
-        std::wcout << color::bright << ')' << color::reset << std::endl;
-    }
-
-    // Printing line with error
-    for (size_t i = lineStartIndex; i < code.size() && code[i] != '\n'; ++i) {
-        if (i == index) std::wcout << color::background::red << color::white;
-        std::wcout << code[i];
-        if (i == index + z[e.GetIndex()].GetValue().size() - 1) std::wcout << color::reset;
-    }
-    std::wcout << std::endl << std::endl;
-
-    std::wcout <<   color::red << color::bright << '1' << color::reset << " error was found" << std::endl;
+    PerformSyntaxAnalysis(lexemes);
+  } catch (const SyntaxAnalysisError & e) {
+    log::error(code, lexemes, e);
+    std::wcout << "Terminated, " << color::bright << color::red << '1' << color::reset << " error was found" << std::endl;
     return 2;
   }
-
-  std::wcout << color::green << color::bright << '0' << color::reset << " errors were found" << std::endl;
+  std::wcout << color::green << color::bright << '0' << color::reset << " errors were found, compiling..." << std::endl;
   return 0;
 }
