@@ -68,12 +68,8 @@ void Keyword();
 void Expression();
 void Struct();
 void VariableIdentifier();
-void VariableIdentifierList();
 void Definition();
 void VariableParameter();
-void VariableParameterList();
-void DefaultParameter();
-void DefaultParameterList();
 void ParameterList();
 void LambdaFunction();
 void Function();
@@ -113,23 +109,6 @@ void Program() {
   debug("Program");
   while (!eof && !IsLexeme(LexemeType::kPunctuation, L"}")) {
     Action();
-  }
-}
-
-void Identifier() {
-  debug("Identifier");
-  Expect(LexemeType::kIdentifier);
-  GetNext();
-}
-
-void Identifiers() {
-  debug("Identifiers");
-  Expect(LexemeType::kIdentifier);
-  GetNext();
-  while (IsLexeme(LexemeType::kPunctuation, L",")) {
-    GetNext();
-    Expect(LexemeType::kIdentifier);
-    GetNext();
   }
 }
 
@@ -181,7 +160,11 @@ void Keyword() {
   else if (IsLexeme(L"continue"))
     Continue();
   else if (IsLexeme(L"struct"))
-    Struct();
+      Struct();
+  else if (IsLexeme(L"try"))
+      Try();
+  else if (IsLexeme(L"throw"))
+      Throw();
   else
     Definition();
 }
@@ -268,34 +251,7 @@ void VariableParameter() {
   VariableIdentifier();
 }
 
-void VariableParameterList() {
-  VariableParameter();
-  while (IsLexeme(LexemeType::kPunctuation, L",")) {
-    GetNext();
-    VariableParameter();
-  }
-}
-
-void DefaultParameter() {
-  VariableParameter();
-  Expect(LexemeType::kOperator, L"=");
-  GetNext();
-  Expression();
-}
-
-void DefaultParameterList() {
-  DefaultParameter();
-  while (IsLexeme(LexemeType::kPunctuation, L",")) {
-    GetNext();
-    DefaultParameter();
-  }
-}
-
 void ParameterList() {
-  // Походу, с такой реализацией, 3 верхних функции не нужны
-  // Иначе я не смог придумать, как реализовать спуск без больших костылей
-  // Я их пока не стал удалять - мало ли...
-
   if (IsLexeme(LexemeType::kParenthesis, L")")) return;
 
   bool startedDefault = false;
