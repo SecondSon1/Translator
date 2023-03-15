@@ -1,4 +1,4 @@
-#include "syntax_analysis.hpp"
+#include "syntax_analyzer.hpp"
 #include "exceptions.hpp"
 #include "lexeme.hpp"
 

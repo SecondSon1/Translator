@@ -5,9 +5,9 @@
 
 #include "lexical_analyzer.hpp"
 #include "logging.hpp"
-#include "syntax_analysis.hpp"
+#include "syntax_analyzer.hpp"
 #include "exceptions.hpp"
-#include "terminal_colors.hpp"
+#include "terminal_formatting.hpp"
 
 void PrintHelp() {
 	// TODO
@@ -27,8 +27,8 @@ int32_t main(const int argc, const char *argv[]) {
   std::wifstream codeFile;
   codeFile.open(argv[1]);
   if (!codeFile.is_open()) {
-	std::wcout << color::bright << color::red << "Cannot open file " << color::reset << argv[1] << std::endl;
-	return 1;
+      std::wcout << format::bright << color::red << "Cannot open file " << format::reset << argv[1] << std::endl;
+      return 1;
   }
 
   std::wstring code;
@@ -48,9 +48,9 @@ int32_t main(const int argc, const char *argv[]) {
     PerformSyntaxAnalysis(lexemes);
   } catch (const SyntaxAnalysisError & e) {
     log::error(code, lexemes, e);
-    std::wcout << "Terminated, " << color::bright << color::red << '1' << color::reset << " error was found" << std::endl;
+    std::wcout << "Terminated, " << format::bright << color::red << '1' << format::reset << " error was found" << std::endl;
     return 2;
   }
-  std::wcout << color::green << color::bright << '0' << color::reset << " errors were found, compiling..." << std::endl;
+  std::wcout << color::green << format::bright << '0' << format::reset << " errors were found, compiling..." << std::endl;
   return 0;
 }

@@ -56,9 +56,6 @@ std::vector<Lexeme> PerformLexicalAnalysis(const std::wstring & code) {
   std::vector<Lexeme> result;
 
   for (size_t i = 0, j = 1; i < code.size(); i = j++) {
-
-    //std::wcout << i << L' ' << j << std::endl;
-
     if (code[i] == L' ' || code[i] == L'\n')
       continue;
 
@@ -79,7 +76,6 @@ std::vector<Lexeme> PerformLexicalAnalysis(const std::wstring & code) {
     str.push_back(code[i]);
 
     if (std::isalpha(code[i]) || code[i] == '_') {                // identifier/reserved
-
       while (j < code.size() && (std::isalpha(code[j]) || code[j] == L'_' || std::isdigit(code[j]))) {
         str.push_back(code[j++]);
       }
@@ -91,9 +87,7 @@ std::vector<Lexeme> PerformLexicalAnalysis(const std::wstring & code) {
         }
       }
       result.emplace_back(resulting_type, str, i);
-
     } else if (std::isdigit(code[i])) {                           // numeric literal
-
       bool is_hex = false;
       if (Fits(code, i, L"0x")) {
         is_hex = true;
@@ -111,9 +105,7 @@ std::vector<Lexeme> PerformLexicalAnalysis(const std::wstring & code) {
           str.push_back(code[j++]);
       }
       result.emplace_back(LexemeType::kNumericLiteral, str, i);
-
     } else if (code[i] == L'"' || code[i] == L'\'') {
-
       wchar_t quote = code[i];
       str.pop_back();
 
@@ -150,11 +142,6 @@ std::vector<Lexeme> PerformLexicalAnalysis(const std::wstring & code) {
       }
 
     }
-
-    //std::wcout << result.back() << std::endl;
-
   }
-
   return result;
-
 }
