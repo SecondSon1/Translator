@@ -64,15 +64,46 @@ class NumberNotFinishedError : public LexicalAnalysisError {
 // ==============================
 
 class SyntaxAnalysisError : public TranslatorError {
- public:
-  SyntaxAnalysisError(size_t index, LexemeType expected) : TranslatorError(index), expected_(expected) {}
+public:
+    SyntaxAnalysisError(size_t index) : TranslatorError(index) {}
 
-  LexemeType GetExpected() const { return expected_; }
+    const char* what() const noexcept override {
+        return "Unknown error at syntax analysis stage";
+    }
+};
 
-  const char* what() const noexcept override {
-    return "Unknown error at syntax analysis stage";
-  }
+class UnexpectedLexeme : public SyntaxAnalysisError {
+public:
+    UnexpectedLexeme(size_t index, LexemeType expected) : SyntaxAnalysisError(index), expected_(expected) {}
 
- private:
-  LexemeType expected_;
+    LexemeType GetExpected() const { return expected_; }
+
+    const char* what() const noexcept override {
+        return "Unexpected lexeme";
+    }
+
+private:
+    LexemeType expected_;
+};
+
+// =================================
+// === Semantics analysis errors ===
+// =================================
+
+class SemanticsAnalysisError : public TranslatorError {
+public:
+    SemanticsAnalysisError(size_t index) : TranslatorError(index) {}
+
+    const char* what() const noexcept override {
+        return "Unknown error at semantics analysis stage";
+    }
+};
+
+class UndeclaredIdentifier : public SemanticsAnalysisError {
+public:
+    UndeclaredIdentifier(size_t index) : SemanticsAnalysisError(index) {}
+
+    const char* what() const noexcept override {
+        return "Use of undeclared identifier";
+    }
 };

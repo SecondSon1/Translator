@@ -41,12 +41,9 @@ int32_t main(const int argc, const char *argv[]) {
 
   auto lexemes = PerformLexicalAnalysis(code);
 
-  // For testing, you can comment this
-  log::warning(code, lexemes, 11);
-
   try {
     PerformSyntaxAnalysis(lexemes);
-  } catch (const SyntaxAnalysisError & e) {
+  } catch (const UnexpectedLexeme & e) {
     log::error(code, lexemes, e);
     std::wcout << "Terminated, " << format::bright << color::red << '1' << format::reset << " error was found" << std::endl;
     return 2;

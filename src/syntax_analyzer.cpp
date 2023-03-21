@@ -39,7 +39,7 @@ void PerformSyntaxAnalysis(const std::vector<Lexeme> & code) {
 
 void Expect(LexemeType type) {
   if (eof || lexeme.GetType() != type)
-    throw SyntaxAnalysisError(_lexeme_index, type);
+    throw UnexpectedLexeme(_lexeme_index, type);
 }
 
 void Expect(LexemeType type, LexemeType others...) {
@@ -49,7 +49,7 @@ void Expect(LexemeType type, LexemeType others...) {
 
 void Expect(LexemeType type, const std::wstring & value) {
   if (eof || lexeme.GetType() != type || lexeme.GetValue() != value)
-    throw SyntaxAnalysisError(_lexeme_index, type);
+    throw UnexpectedLexeme(_lexeme_index, type);
 }
 
 bool IsLexeme(LexemeType type) {
@@ -113,7 +113,6 @@ void Program() {
 }
 
 void Action() {
-
   debug("Action");
   if (IsLexeme(LexemeType::kReserved) || IsLexeme(LexemeType::kVariableType))
     Keyword();
@@ -286,7 +285,8 @@ void Function() {
   ParameterList();
   Expect(LexemeType::kParenthesis, L")");
   GetNext();
-  Block();
+  if (!IsLexeme(LexemeType::kPunctuation, L";"))
+    Block();
   debug("Exited Function");
 }
 

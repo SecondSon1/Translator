@@ -1,0 +1,11 @@
+[project]
+name = "WriteScript"
+version = "0.3.0"
+
+# Optional, adding this will enable direct links from the documentation
+# to your source code.
+git_repo_url = "https://github.com/SecondSon1/Translator/"
+git_default_branch = "main"
+
+[paths]
+compile_commands = "compile_commands.json"
