@@ -20,7 +20,7 @@ Lexeme lexeme;
 
 void GetNext() {
   _lexeme_index++;
-  if (_lexeme_index == _lexemes.size())
+  if (_lexeme_index >= _lexemes.size())
     eof = true;
   else
     lexeme = _lexemes[_lexeme_index];
@@ -35,6 +35,9 @@ void PerformSyntaxAnalysis(const std::vector<Lexeme> & code) {
   lexeme = code[0];
   eof = false;
   Program();
+  if (!eof) {
+      throw UnexpectedLexeme(_lexeme_index, LexemeType::kOperator);
+  }
 }
 
 void Expect(LexemeType type) {

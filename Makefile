@@ -8,7 +8,7 @@ BIN = bin
 INCFLAGS=
 LIBFLAGS=
 CCFLAGS = -std=c++17 -Wextra -Wshadow -Wconversion -Wfloat-equal -O2
-CCFLAGS += -fsanitize=undefined,bounds,address
+#CCFLAGS += -fsanitize=undefined,bounds,address
 
 all: build
 

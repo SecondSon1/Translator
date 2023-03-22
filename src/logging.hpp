@@ -7,7 +7,7 @@
 #include "terminal_formatting.hpp"
 
 namespace log {
-    void error(const std::wstring & code, const std::vector<Lexeme> & lexemes, const UnexpectedLexeme & error) {
+    void error(const std::wstring & code, const std::vector<Lexeme> & lexemes, const TranslatorError & error) {
         size_t index = lexemes[error.GetIndex()].GetIndex();
 
         // Getting lexeme position in file
@@ -24,23 +24,28 @@ namespace log {
         std::wcout << format::bright << lineIndex << ':' << columnIndex << ": ";
         std::wcout << color::red << "error: " << format::reset << format::bright << "unexpected lexeme" << format::reset;
 
-        if (error.GetIndex() == lexemes.size()) {
-            std::wcout << format::bright << " (";
-            std::wcout << "expected: " << color::blue << ToString(error.GetExpected()) << format::reset;
-            std::wcout << format::bright << ", got: " << color::red << "EOF" << format::reset;
-            std::wcout << format::bright << ')' << format::reset;
-            --index;
-        } else {
-            std::wcout << format::bright << " (";
-            std::wcout << "expected: " << color::blue << ToString(error.GetExpected()) << format::reset;
-            std::wcout << format::bright << ", got: " << color::red << ToString(lexemes[error.GetIndex()].GetType()) << format::reset;
-            std::wcout << format::bright << ')' << format::reset;
+        // More info for UnexpectedLexeme
+        UnexpectedLexeme* ul = dynamic_cast<UnexpectedLexeme*>(error);
+        if (ul != nullptr) {
+            if (error.GetIndex() == lexemes.size()) {
+                std::wcout << format::bright << " (";
+                std::wcout << "expected: " << color::blue << ToString(error.GetExpected()) << format::reset;
+                std::wcout << format::bright << ", got: " << color::red << "EOF" << format::reset;
+                std::wcout << format::bright << ')' << format::reset;
+                --index;
+            } else {
+                std::wcout << format::bright << " (";
+                std::wcout << "expected: " << color::blue << ToString(error.GetExpected()) << format::reset;
+                std::wcout << format::bright << ", got: " << color::red << ToString(lexemes[error.GetIndex()].GetType())
+                           << format::reset;
+                std::wcout << format::bright << ')' << format::reset;
+            }
         }
         std::wcout << std::endl;
 
         // Printing line with error
         for (size_t i = lineStartIndex; i < code.size() && code[i] != '\n'; ++i) {
-            if (i == index) std::wcout << color::background::red;
+            if (i == index) std::wcout << color::background::red << color::white;
             std::wcout << code[i];
             if (i == index + lexemes[error.GetIndex()].GetValue().size() - 1) std::wcout << format::reset;
         }
