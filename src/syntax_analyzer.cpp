@@ -35,9 +35,6 @@ void PerformSyntaxAnalysis(const std::vector<Lexeme> & code) {
   lexeme = code[0];
   eof = false;
   Program();
-  if (!eof) {
-      throw UnexpectedLexeme(_lexeme_index, LexemeType::kOperator);
-  }
 }
 
 void Expect(LexemeType type) {
@@ -110,7 +107,7 @@ void Priority16();
 
 void Program() {
   debug("Program");
-  while (!eof && !IsLexeme(LexemeType::kPunctuation, L"}")) {
+  while (!eof) {
     Action();
   }
 }
@@ -137,7 +134,9 @@ void Block() {
   }
   Expect(LexemeType::kPunctuation, L"{");
   GetNext();
-  Program();
+  while (!IsLexeme(LexemeType::kPunctuation, L"}")) {
+      Action();
+  }
   Expect(LexemeType::kPunctuation, L"}");
   GetNext();
 }
