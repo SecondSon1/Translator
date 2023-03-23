@@ -10,7 +10,7 @@ class TranslatorError : public std::exception {
 
   size_t GetIndex() const { return index_; }
 
-  const char* what() const noexcept override {
+  virtual const char* what() const noexcept override {
     return "Unknown translator error";
   }
 
@@ -65,16 +65,23 @@ class NumberNotFinishedError : public LexicalAnalysisError {
 
 class SyntaxAnalysisError : public TranslatorError {
 public:
-    SyntaxAnalysisError(size_t index) : TranslatorError(index) {}
+    SyntaxAnalysisError(const Lexeme & actual) :
+        TranslatorError(actual.GetIndex()), actual_(actual) {}
+
+    Lexeme GetActual() const { return actual_; }
 
     const char* what() const noexcept override {
         return "Unknown error at syntax analysis stage";
     }
+
+private:
+    Lexeme actual_;
 };
 
 class UnexpectedLexeme : public SyntaxAnalysisError {
 public:
-    UnexpectedLexeme(size_t index, LexemeType expected) : SyntaxAnalysisError(index), expected_(expected) {}
+    UnexpectedLexeme(const Lexeme & actual, LexemeType expected) :
+        SyntaxAnalysisError(actual), expected_(expected) {}
 
     LexemeType GetExpected() const { return expected_; }
 

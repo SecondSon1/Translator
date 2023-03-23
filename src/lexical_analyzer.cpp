@@ -112,7 +112,7 @@ std::vector<Lexeme> PerformLexicalAnalysis(const std::wstring & code) {
       while (j < code.size() && code[j] != quote && code[j] != L'\n') {
         if (code[j] == L'\\') {
           if (j + 1 == code.size() || !backslash_chars.count(code[j+1]))
-            throw UnknownEscapeSequenceError(j);
+            throw UnknownEscapeSequenceError(j + 1);
           str += backslash_chars[code[j+1]];
           j += 2;
         } else

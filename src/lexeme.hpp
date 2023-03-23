@@ -16,7 +16,8 @@ enum class LexemeType : uint8_t {
   kBracket        = 6,
   kStringLiteral  = 7,
   kVariableType   = 8,
-  kUnknown        = 255
+  kUnknown        = 254,
+  kNull           = 255
 };
 
 std::wstring ToString(LexemeType type);

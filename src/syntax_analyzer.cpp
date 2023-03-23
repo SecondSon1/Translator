@@ -20,10 +20,12 @@ Lexeme lexeme;
 
 void GetNext() {
   _lexeme_index++;
-  if (_lexeme_index >= _lexemes.size())
-    eof = true;
+  if (_lexeme_index == _lexemes.size()) {
+      eof = true;
+      lexeme = Lexeme(LexemeType::kNull, L"", lexeme.GetIndex() + lexeme.GetValue().size());
+  }
   else
-    lexeme = _lexemes[_lexeme_index];
+      lexeme = _lexemes[_lexeme_index];
 }
 
 void Program();
@@ -39,7 +41,7 @@ void PerformSyntaxAnalysis(const std::vector<Lexeme> & code) {
 
 void Expect(LexemeType type) {
   if (eof || lexeme.GetType() != type)
-    throw UnexpectedLexeme(_lexeme_index, type);
+    throw UnexpectedLexeme(lexeme, type);
 }
 
 void Expect(LexemeType type, LexemeType others...) {
@@ -49,7 +51,7 @@ void Expect(LexemeType type, LexemeType others...) {
 
 void Expect(LexemeType type, const std::wstring & value) {
   if (eof || lexeme.GetType() != type || lexeme.GetValue() != value)
-    throw UnexpectedLexeme(_lexeme_index, type);
+    throw UnexpectedLexeme(lexeme, type);
 }
 
 bool IsLexeme(LexemeType type) {

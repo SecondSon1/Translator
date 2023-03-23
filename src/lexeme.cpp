@@ -21,7 +21,7 @@ std::map<LexemeType, std::vector<std::wstring>> GetLexemeStrings() {
     L"[", L"]"
   };
   ans[LexemeType::kVariableType] = {
-    L"int8", L"int16", L"int32", L"int64", L"uint8", L"uint16", L"uint32", L"uint64", L"f32", L"f64", L"string", L"var", L"void", L"bool", L"func"
+    L"int8", L"int16", L"int32", L"int64", L"uint8", L"uint16", L"uint32", L"uint64", L"f32", L"f64", L"string", L"var", L"void", L"bool", L"func", L"auto"
   };
   return ans;
 }
@@ -41,6 +41,7 @@ std::wstring ToString(LexemeType type) {
     LexemeTypeCase(kStringLiteral);
     LexemeTypeCase(kVariableType);
     LexemeTypeCase(kUnknown);
+    LexemeTypeCase(kNull);
 #undef LexemeTypeCase
   }
 }

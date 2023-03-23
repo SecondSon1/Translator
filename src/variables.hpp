@@ -7,13 +7,15 @@ enum class VariableType {
     kString,
     kBool,
     kVoid,
-    kFunc
+    kFunction,
+    kDynamic,
+    kAuto
 };
 
 class Variable {
 public:
-    Variable(const VariableType type) : _type(type) {};
+    Variable(const VariableType type) : type_(type), returnType_(type) {};
 
 private:
-    const VariableType _type;
+    VariableType type_, returnType_;
 };

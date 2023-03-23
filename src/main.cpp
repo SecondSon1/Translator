@@ -39,21 +39,19 @@ int32_t main(const int argc, const char *argv[]) {
   }
   codeFile.close();
 
+  std::vector<Lexeme> lexemes(0);
   try {
-    auto lexemes = PerformLexicalAnalysis(code);
-    PerformSyntaxAnalysis(lexemes);
+      lexemes = PerformLexicalAnalysis(code);
+      PerformSyntaxAnalysis(lexemes);
   }
-  catch (const LexicalAnalysisError & e) {
-
-  }
-  catch (const UnexpectedLexeme & e) {
-    log::error(code, lexemes, e);
+  catch (const TranslatorError & e) {
+    log::error(code, e);
     std::wcout << "Terminated, " << format::bright << color::red << '1' << format::reset << " error was found" << std::endl;
     return 2;
   }
   catch (...) {
       std::wcout << "Something went wrong. We are sorry about it";
-      return 4;
+      return 3;
   }
   std::wcout << color::green << format::bright << '0' << format::reset << " errors were found, compiling..." << std::endl;
   return 0;
