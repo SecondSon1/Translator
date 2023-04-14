@@ -64,33 +64,33 @@ class NumberNotFinishedError : public LexicalAnalysisError {
 // ==============================
 
 class SyntaxAnalysisError : public TranslatorError {
-public:
-    SyntaxAnalysisError(const Lexeme & actual) :
-        TranslatorError(actual.GetIndex()), actual_(actual) {}
+ public:
+  SyntaxAnalysisError(const Lexeme & actual) :
+    TranslatorError(actual.GetIndex()), actual_(actual) {}
 
-    Lexeme GetActual() const { return actual_; }
+  Lexeme GetActual() const { return actual_; }
 
-    const char* what() const noexcept override {
-        return "Unknown error at syntax analysis stage";
-    }
+  const char* what() const noexcept override {
+    return "Unknown error at syntax analysis stage";
+  }
 
-private:
-    Lexeme actual_;
+ private:
+  Lexeme actual_;
 };
 
 class UnexpectedLexeme : public SyntaxAnalysisError {
-public:
-    UnexpectedLexeme(const Lexeme & actual, LexemeType expected) :
-        SyntaxAnalysisError(actual), expected_(expected) {}
+ public:
+  UnexpectedLexeme(const Lexeme & actual, LexemeType expected) :
+      SyntaxAnalysisError(actual), expected_(expected) {}
 
-    LexemeType GetExpected() const { return expected_; }
+  LexemeType GetExpected() const { return expected_; }
 
-    const char* what() const noexcept override {
-        return "Unexpected lexeme";
-    }
+  const char* what() const noexcept override {
+    return "Unexpected lexeme";
+  }
 
-private:
-    LexemeType expected_;
+ private:
+  LexemeType expected_;
 };
 
 // =================================
@@ -98,19 +98,46 @@ private:
 // =================================
 
 class SemanticsAnalysisError : public TranslatorError {
-public:
-    SemanticsAnalysisError(size_t index) : TranslatorError(index) {}
+ public:
+  SemanticsAnalysisError(const Lexeme & lexeme) : TranslatorError(lexeme.GetIndex()) {}
 
-    const char* what() const noexcept override {
-        return "Unknown error at semantics analysis stage";
-    }
+  const char* what() const noexcept override {
+    return "Unknown error at semantics analysis stage";
+  }
 };
 
 class UndeclaredIdentifier : public SemanticsAnalysisError {
-public:
-    UndeclaredIdentifier(size_t index) : SemanticsAnalysisError(index) {}
+ public:
+  UndeclaredIdentifier(const Lexeme & lexeme) : SemanticsAnalysisError(lexeme) {}
 
-    const char* what() const noexcept override {
-        return "Use of undeclared identifier";
-    }
+  const char* what() const noexcept override {
+    return "Use of undeclared identifier";
+  }
+};
+
+class ConflictingNames : public SemanticsAnalysisError {
+ public:
+  ConflictingNames(const Lexeme & lexeme) : SemanticsAnalysisError(lexeme) {}
+
+  const char* what() const noexcept override {
+    return "Conflicting names for variable/struct";
+  }
+};
+
+class NoScopeAvailableError : public SemanticsAnalysisError {
+ public:
+  NoScopeAvailableError(const Lexeme & lexeme) : SemanticsAnalysisError(lexeme) {}
+
+  const char* what() const noexcept override {
+    return "TID scope is already empty";
+  }
+};
+
+class NotComplexStruct : public SemanticsAnalysisError {
+ public:
+  NotComplexStruct(const Lexeme & lexeme) : SemanticsAnalysisError(lexeme) {}
+
+  const char* what() const noexcept override {
+    return "Argument was not a complex struct";
+  }
 };

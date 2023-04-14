@@ -306,7 +306,8 @@ void Type() {
 }
 
 void TypeNoConst() {
-  Expect(LexemeType::kVariableType);
+  if (!IsLexeme(LexemeType::kVariableType) && !IsLexeme(LexemeType::kIdentifier))
+    Expect(LexemeType::kVariableType);
   GetNext();
 }
 

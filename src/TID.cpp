@@ -1,27 +1,23 @@
-#include <map>
-
 #include "TID.hpp"
 
-void TID::CreateScope() {
-  Node *q = new Node;
-  current->scopes.push_back(q);
-  q->parent = current;
-  current = q;
-}
 
-void TID::ExitScope() {
-  current = current->parent;
-}
-
-void TID::CreateVariable(const std::wstring & name) {
-  current->variables.insert({name, 0});
-}
-
-bool TID::CheckVariable(const std::wstring & name) {
-  Node *q = current;
-  while (q != nullptr) {
-    if (q->variables.find(name) != q->variables.end()) return true;
-    q = q->parent;
+uint32_t GetSizeOfPrimitive(const PrimitiveVariableType & type) {
+  switch (type) {
+    case PrimitiveVariableType::kInt8:
+    case PrimitiveVariableType::kUint8:
+    case PrimitiveVariableType::kChar:
+    case PrimitiveVariableType::kBool:
+      return 1;
+    case PrimitiveVariableType::kInt16:
+    case PrimitiveVariableType::kUint16:
+      return 2;
+    case PrimitiveVariableType::kInt32:
+    case PrimitiveVariableType::kUint32:
+    case PrimitiveVariableType::kF32:
+      return 4;
+    case PrimitiveVariableType::kInt64:
+    case PrimitiveVariableType::kUint64:
+    case PrimitiveVariableType::kF64:
+      return 8;
   }
-  return false;
 }
