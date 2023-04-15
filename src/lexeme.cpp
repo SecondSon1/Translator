@@ -9,7 +9,7 @@ std::map<LexemeType, std::vector<std::wstring>> GetLexemeStrings() {
   ans[LexemeType::kOperator] = {
     L"+", L"-", L"*", L"/", L"%", L"++", L"--", L"&", L"|", L"^", L"&&", L"||", L"==", L"!=",
     L"<", L">", L"<=", L">=", L"<<", L">>", L"=", L"+=", L"-=", L"*=", L"/=", L"%=",
-    L"<<=", L">>=", L"&=", L"^=", L"|=", L".", L"**", L"**="
+    L"<<=", L">>=", L"&=", L"^=", L"|=", L".", L"**", L"**=", L"~"
   };
   ans[LexemeType::kPunctuation] = {
     L",", L";", L"{", L"}", L"=>"
