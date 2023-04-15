@@ -1,6 +1,7 @@
 #include "syntax_analyzer.hpp"
 #include "exceptions.hpp"
 #include "lexeme.hpp"
+#include "TID.hpp"
 
 #define DEBUG_ACTIVE 0
 
@@ -17,6 +18,7 @@ std::vector<Lexeme> _lexemes;
 size_t _lexeme_index;
 bool eof;
 Lexeme lexeme;
+TID tid;
 
 void GetNext() {
   _lexeme_index++;
@@ -69,14 +71,14 @@ void Block();
 void Keyword();
 void Expression();
 void Struct();
-void VariableIdentifier();
+std::shared_ptr<TIDVariableType> VariableIdentifier(std::shared_ptr<TIDVariableType> & type);
 void Definition();
-void VariableParameter();
+TIDVariable VariableParameter();
 void ParameterList();
 void LambdaFunction();
 void Function();
-void Type();
-void TypeNoConst();
+std::shared_ptr<TIDVariableType> Type(bool & _const, bool & _ref);
+std::shared_ptr<TIDVariableType> TypeNoConst();
 void If();
 void Elif();
 void Else();
@@ -130,16 +132,19 @@ void Action() {
 
 void Block() {
   debug("Block");
+  tid.AddScope(lexeme);
   if (!IsLexeme(LexemeType::kPunctuation, L"{")) {
     Action();
+    tid.RemoveScope(lexeme);
     return;
   }
   Expect(LexemeType::kPunctuation, L"{");
   GetNext();
   while (!IsLexeme(LexemeType::kPunctuation, L"}")) {
-      Action();
+    Action();
   }
   Expect(LexemeType::kPunctuation, L"}");
+  tid.RemoveScope(lexeme);
   GetNext();
 }
 
@@ -163,11 +168,11 @@ void Keyword() {
   else if (IsLexeme(L"continue"))
     Continue();
   else if (IsLexeme(L"struct"))
-      Struct();
+    Struct();
   else if (IsLexeme(L"try"))
-      Try();
+    Try();
   else if (IsLexeme(L"throw"))
-      Throw();
+    Throw();
   else
     Definition();
 }
@@ -199,32 +204,55 @@ void Struct() {
   GetNext();
 }
 
-void VariableIdentifier() {
+std::shared_ptr<TIDVariableType> VariableIdentifier(std::shared_ptr<TIDVariableType> & type) {
   debug("Variable Identifier");
-  Expect(LexemeType::kIdentifier);
-  GetNext();
+  uint32_t pointer_count = 0;
+  while (IsLexeme(LexemeType::kOperator, L"*")) {
+    ++pointer_count;
+    GetNext();
+  }
+  std::shared_ptr<TIDVariableType> ptr;
+  if (IsLexeme(LexemeType::kParenthesis, L"(")) {
+    GetNext();
+    ptr = VariableIdentifier(type);
+    Expect(LexemeType::kParenthesis, L")");
+    GetNext();
+  } else {
+    Expect(LexemeType::kIdentifier);
+    GetNext();
+    ptr = type;
+  }
+  while (pointer_count--)
+    ptr = DerivePointerFromType(ptr);
   while (IsLexeme(LexemeType::kBracket, L"[")) {
     GetNext();
     Expression();
     Expect(LexemeType::kBracket, L"]");
     GetNext();
+    ptr = DeriveArrayFromType(ptr);
   }
+  return ptr;
 }
 
 void Definition() {
   debug("Definition");
-  Type();
-  Expect(LexemeType::kIdentifier);
-  GetNext();
-  if (IsLexeme(LexemeType::kParenthesis)) {
-    Function();
-    return;
-  }
-  while (IsLexeme(LexemeType::kBracket, L"[")) {
+  bool _const = false, _ref = false;
+  std::shared_ptr<TIDVariableType> type = Type(_const, _ref);
+  std::shared_ptr<TIDVariableType> variable_type;
+  if (IsLexeme(LexemeType::kIdentifier)) {
     GetNext();
-    Expression();
-    Expect(LexemeType::kBracket, L"]");
-    GetNext();
+    if (IsLexeme(LexemeType::kParenthesis)) {
+      Function();
+      return;
+    }
+    while (IsLexeme(LexemeType::kBracket, L"[")) {
+      GetNext();
+      Expression();
+      Expect(LexemeType::kBracket, L"]");
+      GetNext();
+    }
+  } else {
+    variable_type = VariableIdentifier(type);
   }
   if (IsLexeme(LexemeType::kOperator, L"=")) {
     GetNext();
@@ -249,34 +277,27 @@ void Definition() {
   GetNext();
 }
 
-void VariableParameter() {
-  Type();
-  VariableIdentifier();
+TIDVariable VariableParameter() {
+  bool _const = false, _ref = false;
+  std::shared_ptr<TIDVariableType> type = Type(_const, _ref);
+  std::shared_ptr<TIDVariableType> detailed_type = VariableIdentifier(type);
+  return { detailed_type, _const, _ref };
 }
 
 void ParameterList() {
-  if (IsLexeme(LexemeType::kParenthesis, L")")) return;
+  bool started_default = false;
 
-  bool startedDefault = false;
-
-  VariableParameter();
-  if (IsLexeme(LexemeType::kOperator, L"=")) {
-    startedDefault = true;
-    GetNext();
-    Expression();
-  }
-
-  while (IsLexeme(LexemeType::kPunctuation, L",")) {
-    GetNext();
-    VariableParameter();
-    if (IsLexeme(LexemeType::kOperator, L"=")) {
-      startedDefault = true;
-    }
-    if (startedDefault) {
+  while (true) {
+    TIDVariable var = VariableParameter();
+    if (IsLexeme(LexemeType::kOperator, L"="))
+      started_default = true;
+    if (started_default) {
       Expect(LexemeType::kOperator, L"=");
       GetNext();
       Expression();
     }
+    if (!IsLexeme(LexemeType::kPunctuation, L",")) break;
+    GetNext();
   }
 }
 
@@ -294,21 +315,35 @@ void Function() {
   debug("Exited Function");
 }
 
-void Type() {
+std::shared_ptr<TIDVariableType> Type(bool & _const, bool & _ref) {
   debug("Type");
+  _const = false; _ref = false;
   if (IsLexeme(LexemeType::kReserved, L"const")) {
     GetNext();
+    _const = true;
   }
-  TypeNoConst();
+  std::shared_ptr<TIDVariableType> ptr = TypeNoConst();
   if (IsLexeme(LexemeType::kOperator, L"&")) {
     GetNext();
+    _ref = true;
   }
+  return ptr;
 }
 
-void TypeNoConst() {
+std::shared_ptr<TIDVariableType> TypeNoConst() {
   if (!IsLexeme(LexemeType::kVariableType) && !IsLexeme(LexemeType::kIdentifier))
     Expect(LexemeType::kVariableType);
+  std::shared_ptr<TIDVariableType> ptr;
+  PrimitiveVariableType primitive_type = FromWstringToPrimitiveType(lexeme.GetValue());
+  if (primitive_type == PrimitiveVariableType::kUnknown) {
+    ptr = tid.GetComplexStruct(lexeme.GetValue());
+    if (!ptr)
+      throw UndeclaredIdentifier(lexeme);
+  } else {
+    ptr = GetPrimitiveVariableType(primitive_type);
+  }
   GetNext();
+  return ptr;
 }
 
 void If() {
