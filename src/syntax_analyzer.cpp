@@ -644,7 +644,6 @@ void Priority14() {
   Priority15();
 }
 
-
 void Priority15() {
   Priority16();
   if (IsLexeme(LexemeType::kOperator, L"++")
@@ -666,6 +665,7 @@ void Priority15() {
     } else break;
   }
 }
+
 void Priority16() {
   if (IsLexeme(LexemeType::kNumericLiteral)
     || IsLexeme(LexemeType::kIdentifier)

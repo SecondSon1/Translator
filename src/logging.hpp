@@ -23,17 +23,26 @@ namespace log {
     std::wcout << color::red << "error: " << format::reset << format::bright << error.what() << format::reset;
 
     // More info for UnexpectedLexeme
-    const UnexpectedLexeme *ul = dynamic_cast<const UnexpectedLexeme *>(&error);
-    if (ul != nullptr) {
+    const UnexpectedLexeme *unexpectedLexeme = dynamic_cast<const UnexpectedLexeme *>(&error);
+    if (unexpectedLexeme != nullptr) {
       std::wcout << format::bright << " (";
-      std::wcout << "expected: " << color::blue << ToString(ul->GetExpected()) << format::reset;
-      std::wcout << format::bright << ", got: " << color::red << ToString(ul->GetActual().GetType()) << format::reset;
+      std::wcout << "expected: " << color::blue << ToString(unexpectedLexeme->GetExpected()) << format::reset;
+      std::wcout << format::bright << ", got: " << color::red << ToString(unexpectedLexeme->GetActual().GetType())
+                 << format::reset;
       std::wcout << format::bright << ')' << format::reset;
     }
     std::wcout << std::endl;
 
     // Printing line with error
-    size_t lexemeSize = (ul != nullptr) ? ul->GetActual().GetValue().size() : 1;
+    size_t lexemeSize = 1;
+    const SyntaxAnalysisError *syntaxError = dynamic_cast<const SyntaxAnalysisError *>(&error);
+    const SemanticsAnalysisError *semanticsError = dynamic_cast<const SemanticsAnalysisError *>(&error);
+    if (syntaxError != nullptr) {
+      lexemeSize = syntaxError->GetActual().GetValue().size();
+    } else if (semanticsError != nullptr) {
+      lexemeSize = semanticsError->GetActual().GetValue().size();
+    }
+
     for (size_t i = lineStartIndex; i < code.size() && code[i] != '\n'; ++i) {
       if (i == error.GetIndex()) std::wcout << color::background::red << color::white;
       std::wcout << code[i];

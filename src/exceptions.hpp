@@ -99,11 +99,17 @@ class UnexpectedLexeme : public SyntaxAnalysisError {
 
 class SemanticsAnalysisError : public TranslatorError {
  public:
-  SemanticsAnalysisError(const Lexeme & lexeme) : TranslatorError(lexeme.GetIndex()) {}
+  SemanticsAnalysisError(const Lexeme & actual) :
+      TranslatorError(actual.GetIndex()), actual_(actual) {}
+
+  Lexeme GetActual() const { return actual_; }
 
   const char* what() const noexcept override {
     return "Unknown error at semantics analysis stage";
   }
+
+  private:
+    Lexeme actual_;
 };
 
 class UndeclaredIdentifier : public SemanticsAnalysisError {
