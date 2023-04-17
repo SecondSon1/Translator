@@ -2,6 +2,9 @@
 #include "exceptions.hpp"
 #include "lexeme.hpp"
 #include "TID.hpp"
+#include "operators.hpp"
+#include <memory>
+#include <vector>
 
 #define DEBUG_ACTIVE 0
 
@@ -69,15 +72,15 @@ bool IsLexeme(const std::wstring & value) {
 void Action();
 void Block();
 void Keyword();
-void Expression();
+std::shared_ptr<TIDVariableType> Expression();
 void Struct();
 std::shared_ptr<TIDVariableType> VariableIdentifier(std::shared_ptr<TIDVariableType> & type);
 void Definition();
-TIDVariable VariableParameter();
+std::shared_ptr<TIDVariableType> VariableParameter();
 void ParameterList();
 void LambdaFunction();
 void Function();
-std::shared_ptr<TIDVariableType> Type(bool & _const, bool & _ref);
+std::shared_ptr<TIDVariableType> Type();
 std::shared_ptr<TIDVariableType> TypeNoConst();
 void If();
 void Elif();
@@ -90,24 +93,25 @@ void Try();
 void Throw();
 void Continue();
 void Break();
-void Return();
+std::shared_ptr<TIDVariableType> Return();
+// TODO: should return types of arguments passed down so caller can check if they are correct
 void FunctionCall();
-void Priority1();
-void Priority2();
-void Priority3();
-void Priority4();
-void Priority5();
-void Priority6();
-void Priority7();
-void Priority8();
-void Priority9();
-void Priority10();
-void Priority11();
-void Priority12();
-void Priority13();
-void Priority14();
-void Priority15();
-void Priority16();
+std::shared_ptr<TIDVariableType> Priority1();
+std::shared_ptr<TIDVariableType> Priority2();
+std::shared_ptr<TIDVariableType> Priority3();
+std::shared_ptr<TIDVariableType> Priority4();
+std::shared_ptr<TIDVariableType> Priority5();
+std::shared_ptr<TIDVariableType> Priority6();
+std::shared_ptr<TIDVariableType> Priority7();
+std::shared_ptr<TIDVariableType> Priority8();
+std::shared_ptr<TIDVariableType> Priority9();
+std::shared_ptr<TIDVariableType> Priority10();
+std::shared_ptr<TIDVariableType> Priority11();
+std::shared_ptr<TIDVariableType> Priority12();
+std::shared_ptr<TIDVariableType> Priority13();
+std::shared_ptr<TIDVariableType> Priority14();
+std::shared_ptr<TIDVariableType> Priority15();
+std::shared_ptr<TIDVariableType> Priority16();
 
 void Program() {
   debug("Program");
@@ -132,10 +136,10 @@ void Action() {
 
 void Block() {
   debug("Block");
-  tid.AddScope(lexeme);
+  tid.AddScope();
   if (!IsLexeme(LexemeType::kPunctuation, L"{")) {
     Action();
-    tid.RemoveScope(lexeme);
+    tid.RemoveScope();
     return;
   }
   Expect(LexemeType::kPunctuation, L"{");
@@ -144,13 +148,14 @@ void Block() {
     Action();
   }
   Expect(LexemeType::kPunctuation, L"}");
-  tid.RemoveScope(lexeme);
+  tid.RemoveScope();
   GetNext();
 }
 
 void Keyword() {
   debug("Keyword");
   Expect(LexemeType::kReserved, LexemeType::kVariableType);
+  tid.AddScope();
   if (IsLexeme(L"for"))
     For();
   else if (IsLexeme(L"while"))
@@ -173,20 +178,24 @@ void Keyword() {
     Try();
   else if (IsLexeme(L"throw"))
     Throw();
-  else
+  else {
+    tid.RemoveScope();
     Definition();
+    return;
+  }
+  tid.RemoveScope(); // hacky workaround so I don't have to insert AddScope and RemoveScope inside every "keyword"
 }
 
-void Expression() {
+std::shared_ptr<TIDVariableType> Expression() {
   debug("Expression");
-  Priority1();
+  return Priority1();
 }
 
-void EpsExpression() {
+std::shared_ptr<TIDVariableType> EpsExpression() {
   debug("EpsExpression");
   if (IsLexeme(LexemeType::kPunctuation, L";"))
-    return;
-  Expression();
+    return {};
+  return Expression();
 }
 
 void Struct() {
@@ -236,8 +245,7 @@ std::shared_ptr<TIDVariableType> VariableIdentifier(std::shared_ptr<TIDVariableT
 
 void Definition() {
   debug("Definition");
-  bool _const = false, _ref = false;
-  std::shared_ptr<TIDVariableType> type = Type(_const, _ref);
+  std::shared_ptr<TIDVariableType> type = Type();
   std::shared_ptr<TIDVariableType> variable_type;
   if (IsLexeme(LexemeType::kIdentifier)) {
     GetNext();
@@ -277,18 +285,17 @@ void Definition() {
   GetNext();
 }
 
-TIDVariable VariableParameter() {
-  bool _const = false, _ref = false;
-  std::shared_ptr<TIDVariableType> type = Type(_const, _ref);
+std::shared_ptr<TIDVariableType> VariableParameter() {
+  std::shared_ptr<TIDVariableType> type = Type();
   std::shared_ptr<TIDVariableType> detailed_type = VariableIdentifier(type);
-  return { detailed_type, _const, _ref };
+  return detailed_type;
 }
 
 void ParameterList() {
   bool started_default = false;
 
   while (true) {
-    TIDVariable var = VariableParameter();
+    std::shared_ptr<TIDVariableType> var = VariableParameter();
     if (IsLexeme(LexemeType::kOperator, L"="))
       started_default = true;
     if (started_default) {
@@ -310,14 +317,15 @@ void Function() {
   ParameterList();
   Expect(LexemeType::kParenthesis, L")");
   GetNext();
+  // Check if list of arguments is ok
   if (!IsLexeme(LexemeType::kPunctuation, L";"))
     Block();
   debug("Exited Function");
 }
 
-std::shared_ptr<TIDVariableType> Type(bool & _const, bool & _ref) {
+std::shared_ptr<TIDVariableType> Type() {
   debug("Type");
-  _const = false; _ref = false;
+  bool _const = false, _ref = false;
   if (IsLexeme(LexemeType::kReserved, L"const")) {
     GetNext();
     _const = true;
@@ -327,6 +335,8 @@ std::shared_ptr<TIDVariableType> Type(bool & _const, bool & _ref) {
     GetNext();
     _ref = true;
   }
+  ptr->SetConst(_const);
+  ptr->SetReference(_ref);
   return ptr;
 }
 
@@ -353,9 +363,12 @@ void If() {
   Expect(LexemeType::kParenthesis, L"(");
   GetNext();
   debug("lol");
-  Expression();
+  std::shared_ptr<TIDVariableType> type = Expression();
   Expect(LexemeType::kParenthesis, L")");
   GetNext();
+  // Workaround: will throw exception if expression is not convertible to bool
+  // TODO: change to casting system
+  UnaryPrefixOperation(UnaryPrefixOperator::kInvert, type, lexeme);
   Block();
   Elif();
   if (IsLexeme(LexemeType::kReserved, L"else"))
@@ -390,7 +403,9 @@ void For() {
     Definition();
   else
     GetNext();
-  EpsExpression();
+  std::shared_ptr<TIDVariableType> type = EpsExpression();
+  if (type)
+    UnaryPrefixOperation(UnaryPrefixOperator::kInvert, type, lexeme); // TODO: change to casting system
   Expect(LexemeType::kPunctuation, L";");
   GetNext();
   EpsExpression();
@@ -405,11 +420,16 @@ void Foreach() {
   GetNext();
   Expect(LexemeType::kParenthesis, L"(");
   GetNext();
-  VariableParameter();
+  std::shared_ptr<TIDVariableType> iter_type = VariableParameter();
   Expect(LexemeType::kReserved, L"of");
   GetNext();
-  Expression();
+  std::shared_ptr<TIDVariableType> arr_type = Expression();
   Expect(LexemeType::kParenthesis, L")");
+  if (arr_type->GetType() != VariableType::kArray)
+    throw TypeNotIterable(lexeme); // TODO: thrown lexeme is not the one needed lol
+  auto expected_type = std::static_pointer_cast<TIDArrayVariableType>(arr_type)->GetValue();
+  if (expected_type != iter_type)
+    throw TypeMismatch(lexeme, expected_type, iter_type);
   GetNext();
   Block();
 }
@@ -419,8 +439,10 @@ void While() {
   GetNext();
   Expect(LexemeType::kParenthesis, L"(");
   GetNext();
-  Expression();
+  auto type = Expression();
   Expect(LexemeType::kParenthesis, L")");
+  // TODO: change to casting system
+  UnaryPrefixOperation(UnaryPrefixOperator::kInvert, type, lexeme);
   GetNext();
   Block();
 }
@@ -433,8 +455,10 @@ void DoWhile() {
   GetNext();
   Expect(LexemeType::kReserved, L"while");
   GetNext();
-  Expression();
+  auto type = Expression();
   Expect(LexemeType::kParenthesis, L")");
+  // TODO: change to casting system
+  UnaryPrefixOperation(UnaryPrefixOperator::kInvert, type, lexeme);
   GetNext();
   Expect(LexemeType::kPunctuation, L";");
   GetNext();
@@ -445,13 +469,7 @@ void Try() {
   GetNext();
   Block();
   Expect(LexemeType::kReserved, L"catch");
-  GetNext();
-  Expect(LexemeType::kParenthesis, L"(");
-  GetNext();
-  VariableParameter();
-  Expect(LexemeType::kParenthesis, L")");
-  GetNext();
-  Block();
+  // TODO: any type checking would be nice
   while (IsLexeme(LexemeType::kReserved, L"catch")) {
     GetNext();
     Expect(LexemeType::kParenthesis, L"(");
@@ -467,6 +485,7 @@ void Throw() {
   Expect(LexemeType::kReserved, L"throw");
   GetNext();
   Expression();
+  // TODO: wtf to do with throw
   Expect(LexemeType::kPunctuation, L";");
   GetNext();
 }
@@ -485,12 +504,13 @@ void Break() {
   GetNext();
 }
 
-void Return() {
+std::shared_ptr<TIDVariableType> Return() {
   Expect(LexemeType::kReserved, L"return");
   GetNext();
-  Expression();
+  auto type = Expression();
   Expect(LexemeType::kPunctuation, L";");
   GetNext();
+  return type;
 }
 
 void FunctionCall() {
@@ -508,30 +528,42 @@ void FunctionCall() {
   GetNext();
 }
 
-const size_t signs1_sz = 12;
-const std::wstring signs1[signs1_sz] = {
+const size_t signs1_sz = /*12*/ 11; // no power (**) 'cause it messes with pointers
+/*const std::wstring signs1[signs1_sz] = {
   L"=", L"<<=", L">>=", L"+=", L"-=", L"*=", L"**=", L"/=",
   L"^=", L"&=", L"|=", L"%="
+};*/
+const BinaryOperator signs1[signs1_sz] = {
+  BinaryOperator::kAssignment, BinaryOperator::kBitwiseShiftLeftAssignment, BinaryOperator::kBitwiseShiftRightAssignment,
+  BinaryOperator::kAdditionAssignment, BinaryOperator::kSubtractionAssignment, BinaryOperator::kMultiplicationAssignment,
+  BinaryOperator::kDivisionAssignment, BinaryOperator::kBitwiseXorAssignment, BinaryOperator::kBitwiseOrAssignment,
+  BinaryOperator::kBitwiseAndAssignment, BinaryOperator::kModulusAssignment
 };
 
-void Priority1() {
-  Priority2();
+std::shared_ptr<TIDVariableType> Priority1() {
+  std::vector<std::pair<BinaryOperator, std::shared_ptr<TIDVariableType>>> st;
+  st.emplace_back(BinaryOperator::kUnknown, Priority2());
 
   while (true) {
-    bool found = false;
-    for (size_t sign = 0; sign < signs1_sz; ++sign) {
-      if (IsLexeme(signs1[sign])) {
-        found = true;
+    BinaryOperator found_op = BinaryOperator::kUnknown;
+    for (BinaryOperator op : signs1) {
+      if (IsLexeme(ToString(op))) {
+        found_op = op;
         break;
       }
     }
-    if (!found) break;
+    if (found_op == BinaryOperator::kUnknown) break;
     GetNext();
-    Priority2();
+    st.emplace_back(found_op, Priority2());
   }
+  // all assignment operations are right to left so here we go
+  while (st.size() >= 2) {
+    // TODO: I didn't do binary type validation yet so if I add it now it will always fail
+  }
+  return st[0].second;
 }
 
-void Priority2() {
+std::shared_ptr<TIDVariableType> Priority2() {
   Priority3();
   while (IsLexeme(LexemeType::kOperator, L"&&")) {
     GetNext();
@@ -539,7 +571,7 @@ void Priority2() {
   }
 }
 
-void Priority3() {
+std::shared_ptr<TIDVariableType> Priority3() {
   Priority4();
   while (IsLexeme(LexemeType::kOperator, L"||")) {
     GetNext();
@@ -547,7 +579,7 @@ void Priority3() {
   }
 }
 
-void Priority4() {
+std::shared_ptr<TIDVariableType> Priority4() {
   Priority5();
   while (IsLexeme(LexemeType::kOperator, L"&")) {
     GetNext();
@@ -555,7 +587,7 @@ void Priority4() {
   }
 }
 
-void Priority5() {
+std::shared_ptr<TIDVariableType> Priority5() {
   Priority6();
   while (IsLexeme(LexemeType::kOperator, L"|")) {
     GetNext();
@@ -563,7 +595,7 @@ void Priority5() {
   }
 }
 
-void Priority6() {
+std::shared_ptr<TIDVariableType> Priority6() {
   Priority7();
   while (IsLexeme(LexemeType::kOperator, L"^")) {
     GetNext();
@@ -571,7 +603,7 @@ void Priority6() {
   }
 }
 
-void Priority7() {
+std::shared_ptr<TIDVariableType> Priority7() {
   Priority8();
   while (IsLexeme(LexemeType::kOperator, L"==")
     || IsLexeme(LexemeType::kOperator, L"!=")) {
@@ -580,7 +612,7 @@ void Priority7() {
   }
 }
 
-void Priority8() {
+std::shared_ptr<TIDVariableType> Priority8() {
   Priority9();
   while (IsLexeme(LexemeType::kOperator, L"<")
     || IsLexeme(LexemeType::kOperator, L"<=")
@@ -591,7 +623,7 @@ void Priority8() {
   }
 }
 
-void Priority9() {
+std::shared_ptr<TIDVariableType> Priority9() {
   Priority10();
   while (IsLexeme(LexemeType::kOperator, L"<<")
     || IsLexeme(LexemeType::kOperator, L">>")) {
@@ -600,7 +632,7 @@ void Priority9() {
   }
 }
 
-void Priority10() {
+std::shared_ptr<TIDVariableType> Priority10() {
   Priority11();
   while (IsLexeme(LexemeType::kOperator, L"+")
     || IsLexeme(LexemeType::kOperator, L"-")) {
@@ -609,7 +641,7 @@ void Priority10() {
   }
 }
 
-void Priority11() {
+std::shared_ptr<TIDVariableType> Priority11() {
   Priority12();
   while (IsLexeme(LexemeType::kOperator, L"*")
     || IsLexeme(LexemeType::kOperator, L"/")
@@ -619,7 +651,7 @@ void Priority11() {
   }
 }
 
-void Priority12() {
+std::shared_ptr<TIDVariableType> Priority12() {
   Priority13();
   while (IsLexeme(LexemeType::kOperator, L"**")) {
     GetNext();
@@ -627,29 +659,40 @@ void Priority12() {
   }
 }
 
-void Priority13() {
+std::shared_ptr<TIDVariableType> Priority13() {
   if (IsLexeme(LexemeType::kOperator, L"!")) {
     GetNext();
   }
   Priority14();
 }
 
-void Priority14() {
-  if (IsLexeme(LexemeType::kOperator, L"+")
-    || IsLexeme(LexemeType::kOperator, L"-")
-    || IsLexeme(LexemeType::kOperator, L"++")
-    || IsLexeme(LexemeType::kOperator, L"--")) {
-    GetNext();
-  }
-  Priority15();
+std::shared_ptr<TIDVariableType> Priority14() {
+  UnaryPrefixOperator op = UnaryPrefixOperator::kUnknown;
+  bool get_next = true;
+  if (IsLexeme(LexemeType::kOperator, L"+"))
+    op = UnaryPrefixOperator::kPlus;
+  else if (IsLexeme(LexemeType::kOperator, L"-"))
+    op = UnaryPrefixOperator::kMinus;
+  else if (IsLexeme(LexemeType::kOperator, L"++"))
+    op = UnaryPrefixOperator::kIncrement;
+  else if (IsLexeme(LexemeType::kOperator, L"--"))
+    op = UnaryPrefixOperator::kDecrement;
+  else
+    get_next = false;
+  if (get_next) GetNext();
+  auto type = Priority15();
+  if (op == UnaryPrefixOperator::kUnknown) return type;
+  else return UnaryPrefixOperation(op, type, lexeme);
 }
 
-void Priority15() {
-  Priority16();
+std::shared_ptr<TIDVariableType> Priority15() {
+  auto type = Priority16();
   if (IsLexeme(LexemeType::kOperator, L"++")
     || IsLexeme(LexemeType::kOperator, L"--")) {
+    UnaryPostfixOperator op = IsLexeme(LexemeType::kOperator, L"++") ? UnaryPostfixOperator::kIncrement
+      : UnaryPostfixOperator::kDecrement;
     GetNext();
-    return;
+    return UnaryPostfixOperation(type, op, lexeme);
   }
   while (true) {
     if (IsLexeme(LexemeType::kBracket, L"[")) {
@@ -666,7 +709,7 @@ void Priority15() {
   }
 }
 
-void Priority16() {
+std::shared_ptr<TIDVariableType> Priority16() {
   if (IsLexeme(LexemeType::kNumericLiteral)
     || IsLexeme(LexemeType::kIdentifier)
     || IsLexeme(LexemeType::kStringLiteral)

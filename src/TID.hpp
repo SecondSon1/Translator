@@ -1,11 +1,11 @@
 #pragma once
 
-#include "exceptions.hpp"
 #include <memory>
 #include <stdexcept>
 #include <string>
 #include <vector>
 #include <map>
+#include "lexeme.hpp"
 
 enum class VariableType : uint8_t {
   kPrimitive, kComplex, kFunction, kPointer, kArray
@@ -17,14 +17,20 @@ class TIDVariableType {
   VariableType GetType() const { return variable_type_; }
   uint32_t GetSize() const { return size_; }
 
+  bool IsConst() const { return const_; }
+  bool IsReference() const { return ref_; }
+  void SetConst(bool val) { ref_ = val; }
+  void SetReference(bool val) { const_ = val; }
+
  protected:
   TIDVariableType(VariableType type, uint32_t size)
-      : variable_type_(type), size_(size) {}
+      : variable_type_(type), size_(size), const_(false), ref_(false) {}
   void SetSize(uint32_t size) { size_ = size; }
 
  private:
   VariableType variable_type_;
   uint32_t size_;
+  bool const_, ref_;
 };
 
 enum class PrimitiveVariableType : uint8_t {
@@ -117,36 +123,15 @@ class TIDArrayVariableType : public TIDVariableType {
   std::shared_ptr<TIDVariableType> value_;
 };
 
-class TIDVariable {
- public:
-  TIDVariable() : type_(nullptr), const_(false), reference_(false) {}
-  TIDVariable(const std::shared_ptr<const TIDVariableType> & type) : type_(type), const_(false), reference_(false) {}
-  TIDVariable(const std::shared_ptr<const TIDVariableType> & type, bool constant, bool ref)
-    : type_(type), const_(constant), reference_(ref) {}
-
-  bool IsEmpty() const { return type_ == nullptr; }
-
-  bool IsConst() const { return const_; }
-  bool IsReference() const { return reference_; }
-
-  void SetConst(bool value) { const_ = value; }
-  void SetReference(bool value) { reference_ = value; }
-
-  std::shared_ptr<const TIDVariableType> GetType() const { return type_; }
-
- private:
-  std::shared_ptr<const TIDVariableType> type_;
-  bool const_;
-  bool reference_;
-};
-
 std::shared_ptr<TIDVariableType> GetPrimitiveVariableType(PrimitiveVariableType type);
 std::shared_ptr<TIDVariableType> DerivePointerFromType(const std::shared_ptr<TIDVariableType> & type);
 std::shared_ptr<TIDVariableType> DeriveArrayFromType(const std::shared_ptr<TIDVariableType> & type);
+std::shared_ptr<TIDVariableType> SetConstToType(const std::shared_ptr<TIDVariableType> & type, bool _const);
+std::shared_ptr<TIDVariableType> SetReferenceToType(const std::shared_ptr<TIDVariableType> & type, bool _ref);
 
 class TID {
  public:
-  TID() { AddScope(Lexeme() /* unused anyways :) */); }
+  TID() { AddScope(); }
 
   // All of them will return nullptr in std::shared_ptr if complex struct/variable is not found
   std::shared_ptr<const TIDVariableType> GetComplexStruct(const std::wstring & name) const {
@@ -160,49 +145,30 @@ class TID {
     return std::const_pointer_cast<TIDVariableType>(const_cast<const TID &>(*this).GetComplexStruct(name));
   }
 
-  TIDVariable GetVariable(const std::wstring & name) const {
+  std::shared_ptr<const TIDVariableType> GetVariable(const std::wstring & name) const {
     for (size_t scope_index = nodes_.size() - 1; ~scope_index; --scope_index)
       if (nodes_[scope_index].variables_.count(name))
         return nodes_[scope_index].variables_.at(name);
     // Not found, returning empty variable
     return {};
   }
-  TIDVariable GetVariable(const std::wstring & name) {
-    return const_cast<const TID &>(*this).GetVariable(name);
+  std::shared_ptr<TIDVariableType> GetVariable(const std::wstring & name) {
+    return std::const_pointer_cast<TIDVariableType>(const_cast<const TID &>(*this).GetVariable(name));
   }
 
  public:
-  void AddScope([[maybe_unused]] const Lexeme & current_lexeme) {
-    nodes_.emplace_back();
-  }
-
-  void RemoveScope([[maybe_unused]] const Lexeme & current_lexeme) {
-    if (nodes_.size() == 1)
-      throw NoScopeAvailableError(current_lexeme);
-    nodes_.pop_back();
-  }
-
-  void AddComplexStruct([[maybe_unused]] const Lexeme & current_lexeme, const std::wstring & name,
-      const std::shared_ptr<TIDVariableType> & complex_struct) {
-    if (std::dynamic_pointer_cast<TIDComplexVariableType>(complex_struct) == nullptr)
-      throw NotComplexStruct(current_lexeme);
-    if (nodes_.back().complex_structs_.count(name) || nodes_.back().variables_.count(name))
-      throw ConflictingNames(current_lexeme);
-    nodes_.back().complex_structs_[name] = complex_struct;
-  }
-
-  void AddVariable([[maybe_unused]] const Lexeme & current_lexeme, const std::wstring & name,
-      const TIDVariable & variable) {
-    if (nodes_.back().complex_structs_.count(name) || nodes_.back().variables_.count(name))
-      throw ConflictingNames(current_lexeme);
-    nodes_.back().variables_[name] = variable;
-  }
+  void AddScope();
+  void RemoveScope();
+  void AddComplexStruct(const Lexeme & lexeme, const std::wstring & name,
+                        const std::shared_ptr<TIDVariableType> & complex_struct);
+  void AddVariable(const Lexeme & lexeme, const std::wstring & name,
+                   const std::shared_ptr<TIDVariableType> & variable);
 
  private:
   struct TIDNode {
     TIDNode() {}
     std::map<std::wstring, std::shared_ptr<TIDVariableType>> complex_structs_;
-    std::map<std::wstring, TIDVariable> variables_;
+    std::map<std::wstring, std::shared_ptr<TIDVariableType>> variables_;
   };
   std::vector<TIDNode> nodes_;
 };

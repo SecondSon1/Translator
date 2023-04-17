@@ -3,7 +3,6 @@
 #include <exception>
 #include <stdexcept>
 #include <string>
-#include "TID.hpp"
 #include "lexeme.hpp"
 #include "operators.hpp"
 
@@ -146,30 +145,6 @@ class UnknownOperator : public SemanticsAnalysisError {
   Operator op_;
 };
 
-class TypeNotIterable : public SemanticsAnalysisError {
- public:
-  TypeNotIterable(const Lexeme & lexeme) : SemanticsAnalysisError(lexeme) {}
-
-  const char* what() const noexcept override {
-    return "Provided type is not iterable";
-  }
-};
-
-class TypeMismatch : public SemanticsAnalysisError {
- public:
-  TypeMismatch(const Lexeme & lexeme, const std::shared_ptr<TIDVariableType> & expected, const std::shared_ptr<TIDVariableType> & got)
-    : SemanticsAnalysisError(lexeme), expected_(expected), got_(got) {}
-
-  std::shared_ptr<TIDVariableType> GetTypeExpected() const { return expected_; }
-  std::shared_ptr<TIDVariableType> GetTypeGot() const { return got_; }
-
-  const char* what() const noexcept override {
-    return "Provided type is mismatched";
-  }
-
- private:
-  std::shared_ptr<TIDVariableType> expected_, got_;
-};
 
 
 // ======================================

@@ -2,6 +2,11 @@
 
 #include <map>
 #include <string>
+#include "TID.hpp"
+
+enum class OperatorType : uint8_t {
+  kUnaryPrefix, kUnaryPostfix, kBinary
+};
 
 enum class UnaryPrefixOperator : uint8_t {
   kIncrement                    = 0,
@@ -20,12 +25,12 @@ enum class UnaryPrefixOperator : uint8_t {
 enum class UnaryPostfixOperator : uint8_t {
   kIncrement                    = 10,
   kDecrement                    = 11,
-  kFunctionCall                 = 12,
-  kSubscript                    = 13,
   kUnknown                      = 254
 };
 
 enum class BinaryOperator : uint8_t {
+  kFunctionCall                 = 12,
+  kSubscript                    = 13,
   kMemberAccess                 = 14,
   kMultiplication               = 15,
   kDivision                     = 16,
@@ -59,6 +64,26 @@ enum class BinaryOperator : uint8_t {
   kUnknown                      = 255
 };
 
+class Operator {
+ public:
+  Operator(UnaryPrefixOperator op) : type_(OperatorType::kUnaryPrefix), u_pre_op_(op) {}
+  Operator(UnaryPostfixOperator op) : type_(OperatorType::kUnaryPostfix), u_post_op_(op) {}
+  Operator(BinaryOperator op) : type_(OperatorType::kBinary), bin_op_(op) {}
+
+  OperatorType GetOperatorType() const { return type_; }
+  UnaryPrefixOperator GetUnaryPrefixOperator() const;
+  UnaryPostfixOperator GetUnaryPostfixOperator() const;
+  BinaryOperator GetBinaryOperator() const;
+
+ private:
+  OperatorType type_;
+  union {
+    UnaryPrefixOperator u_pre_op_;
+    UnaryPostfixOperator u_post_op_;
+    BinaryOperator bin_op_;
+  };
+};
+
 std::wstring ToString(UnaryPrefixOperator op);
 std::wstring ToString(UnaryPostfixOperator op);
 std::wstring ToString(BinaryOperator op);
@@ -66,3 +91,7 @@ std::wstring ToString(BinaryOperator op);
 UnaryPrefixOperator UnaryPrefixOperatorByString(const std::wstring & str);
 UnaryPostfixOperator UnaryPostfixOperatorByString(const std::wstring & str);
 BinaryOperator BinaryOperatorByString(const std::wstring & str);
+
+std::shared_ptr<TIDVariableType> UnaryPrefixOperation(UnaryPrefixOperator op, const std::shared_ptr<TIDVariableType> & type, const Lexeme & lexeme);
+std::shared_ptr<TIDVariableType> UnaryPostfixOperation(const std::shared_ptr<TIDVariableType> & type, UnaryPostfixOperator op, const Lexeme & lexeme);
+std::shared_ptr<TIDVariableType> BinaryOperation(const std::shared_ptr<TIDVariableType> & lhs, BinaryOperator op, const std::shared_ptr<TIDVariableType> & rhs);

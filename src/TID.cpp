@@ -1,5 +1,6 @@
 #include "TID.hpp"
 
+#include "exceptions.hpp"
 
 uint32_t GetSizeOfPrimitive(const PrimitiveVariableType & type) {
   switch (type) {
@@ -65,4 +66,73 @@ std::shared_ptr<TIDVariableType> DeriveArrayFromType(const std::shared_ptr<TIDVa
   if (!cache.count(type))
     cache[type] = std::make_shared<TIDArrayVariableType>(TIDArrayVariableType::Guard(0), type);
   return cache[type];
+}
+
+std::shared_ptr<TIDVariableType> Copy(const std::shared_ptr<TIDVariableType> & type) {
+  std::shared_ptr<TIDVariableType> ans;
+  switch (type->GetType()) {
+    case VariableType::kArray:
+      ans = std::make_shared<TIDArrayVariableType>(*std::static_pointer_cast<TIDArrayVariableType>(type));
+      break;
+    case VariableType::kComplex:
+      ans = std::make_shared<TIDComplexVariableType>(*type);
+      break;
+    case VariableType::kFunction:
+      ans = std::make_shared<TIDFunctionVariableType>(*type);
+      break;
+    case VariableType::kPointer:
+      ans = std::make_shared<TIDPointerVariableType>(*type);
+      break;
+    case VariableType::kPrimitive:
+      ans = std::make_shared<TIDPrimitiveVariableType>(*type);
+      break;
+  }
+  return ans;
+}
+
+std::shared_ptr<TIDVariableType> SetConstToType(const std::shared_ptr<TIDVariableType> & type, bool _const) {
+  static std::map<std::shared_ptr<TIDVariableType>, std::shared_ptr<TIDVariableType>> cache;
+  if (type->IsConst() == _const) return type;
+  if (!cache.count(type)) {
+    std::shared_ptr<TIDVariableType> ptr = Copy(type);
+    ptr->SetConst(_const);
+    cache[type] = std::move(ptr);
+  }
+  return cache[type];
+}
+
+std::shared_ptr<TIDVariableType> SetReferenceToType(const std::shared_ptr<TIDVariableType> & type, bool _ref) {
+  static std::map<std::shared_ptr<TIDVariableType>, std::shared_ptr<TIDVariableType>> cache;
+  if (type->IsConst() == _ref) return type;
+  if (!cache.count(type)) {
+    std::shared_ptr<TIDVariableType> ptr = Copy(type);
+    ptr->SetReference(_ref);
+    cache[type] = std::move(ptr);
+  }
+  return cache[type];
+}
+
+void TID::AddScope() {
+  nodes_.emplace_back();
+}
+
+void TID::RemoveScope() {
+  if (nodes_.size() == 1)
+    throw NoScopeAvailableError();
+  nodes_.pop_back();
+}
+void TID::AddComplexStruct(const Lexeme & lexeme, const std::wstring & name,
+    const std::shared_ptr<TIDVariableType> & complex_struct) {
+  if (std::dynamic_pointer_cast<TIDComplexVariableType>(complex_struct) == nullptr)
+    throw NotComplexStructError();
+  if (nodes_.back().complex_structs_.count(name) || nodes_.back().variables_.count(name))
+    throw ConflictingNames(lexeme);
+  nodes_.back().complex_structs_[name] = complex_struct;
+}
+
+void TID::AddVariable(const Lexeme & lexeme, const std::wstring & name,
+    const std::shared_ptr<TIDVariableType> & variable) {
+  if (nodes_.back().complex_structs_.count(name) || nodes_.back().variables_.count(name))
+    throw ConflictingNames(lexeme);
+  nodes_.back().variables_[name] = variable;
 }
