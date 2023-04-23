@@ -33,6 +33,9 @@ class TIDVariableType {
   bool const_, ref_;
 };
 
+// if you change this list you need to change another few
+// parameters in operators.cpp in casting section
+// TODO: work around c++'s dumb header file includes
 enum class PrimitiveVariableType : uint8_t {
   kInt8 = 0, kInt16 = 1, kInt32 = 2, kInt64 = 3,
   kUint8 = 4, kUint16 = 5, kUint32 = 6, kUint64 = 7,
@@ -51,6 +54,8 @@ class TIDPrimitiveVariableType : public TIDVariableType {
   TIDPrimitiveVariableType([[maybe_unused]] Guard _, PrimitiveVariableType & type)
     : TIDVariableType(VariableType::kPrimitive, GetSizeOfPrimitive(type)), type_(type) {}
 
+  PrimitiveVariableType GetPrimitiveType() const { return type_; }
+
  private:
   friend std::shared_ptr<TIDVariableType> GetPrimitiveVariableType(PrimitiveVariableType);
 
@@ -60,18 +65,18 @@ class TIDPrimitiveVariableType : public TIDVariableType {
 
 class TIDComplexVariableType : public TIDVariableType {
  public:
-  TIDComplexVariableType(const std::vector<std::shared_ptr<TIDVariableType>> & contents)
+  TIDComplexVariableType(const std::vector<std::pair<std::wstring, std::shared_ptr<TIDVariableType>>> & contents)
     : TIDVariableType(VariableType::kComplex, 0), contents_(contents) {
     uint32_t our_size = 0;
-    for (const std::shared_ptr<TIDVariableType> & type : contents_)
+    for (const auto & [name, type] : contents_)
       our_size += type->GetSize();
     SetSize(our_size);
   }
 
-  const std::vector<std::shared_ptr<TIDVariableType>> & GetContents() const { return contents_; }
+  const std::vector<std::pair<std::wstring, std::shared_ptr<TIDVariableType>>> & GetContents() const { return contents_; }
 
  private:
-  std::vector<std::shared_ptr<TIDVariableType>> contents_;
+  std::vector<std::pair<std::wstring, std::shared_ptr<TIDVariableType>>> contents_;
 };
 
 class TIDFunctionVariableType : public TIDVariableType {
