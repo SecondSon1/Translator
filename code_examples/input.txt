@@ -1,6 +1,5 @@
 if (false) {
-    string aboba;
-    bool a = aboba;
+    bool a = 1;
 }
 
 const int32 N = 1 << 20;

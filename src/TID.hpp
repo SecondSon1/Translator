@@ -126,7 +126,7 @@ class TIDArrayVariableType : public TIDVariableType {
 
  public:
   TIDArrayVariableType([[maybe_unused]] Guard _, const std::shared_ptr<TIDVariableType> & value)
-    : TIDVariableType(VariableType::kPointer, 8), value_(value) {}
+    : TIDVariableType(VariableType::kArray, 8), value_(value) {}
   std::shared_ptr<TIDVariableType> GetValue() const { return value_; }
 
  private:
