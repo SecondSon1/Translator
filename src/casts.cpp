@@ -21,23 +21,31 @@ void SetUpCastingPrimitives() {
 
   Cast(kBool, kInt8);
   Cast(kChar, kUint8);
+  Cast(kUint8, kChar);
 
   Cast(kInt8, kUint8);
+  Cast(kUint8, kInt8);
   Cast(kInt8, kInt16);
   Cast(kUint8, kUint16);
+  Cast(kUint8, kInt16);
 
   Cast(kInt16, kUint16);
+  Cast(kUint16, kInt16);
   Cast(kInt16, kInt32);
   Cast(kUint16, kUint32);
+  Cast(kUint16, kInt32);
 
   Cast(kInt32, kUint32);
+  Cast(kUint32, kInt32);
   Cast(kInt32, kInt64);
   Cast(kUint32, kUint64);
+  Cast(kUint32, kInt64);
   Cast(kInt32, kF32);
   Cast(kUint32, kF32);
   Cast(kF32, kF64);
 
   Cast(kInt64, kUint64);
+  Cast(kUint64, kInt64);
   Cast(kInt64, kF64);
   Cast(kUint64, kF64);
 
@@ -59,7 +67,7 @@ void SetUpCastingPrimitives() {
   for (uint8_t x = 0; x < kPrimitiveVariableTypeCount; ++x) {
     for (PrimitiveVariableType type : up_cast[x]) {
       can_cast[x][static_cast<uint8_t>(type)] = 0;
-      can_cast[x][static_cast<uint8_t>(type)] = 1;
+      can_cast[static_cast<uint8_t>(type)][x] = 1;
     }
   }
   for (uint8_t through = 0; through < kPrimitiveVariableTypeCount; ++through) {
@@ -79,6 +87,9 @@ void SetUpCastingPrimitives() {
 
 int8_t CastValue(const std::shared_ptr<TIDVariableType> & from, const std::shared_ptr<TIDVariableType> & to) {
   if (from == to) return 0;
+  if (from == nullptr || to == nullptr) return -1;
+  if ((from->IsConst() && !to->IsConst()) || (!from->IsReference() && to->IsReference()))
+    return -1;
   if (from->GetType() != to->GetType()) return -1;
   if (from->GetType() != VariableType::kPrimitive) {
     // we don't cast complex structs and functions, also arrays, but can if we really want
@@ -101,12 +112,15 @@ bool CanCast(const std::shared_ptr<TIDVariableType> & from, const std::shared_pt
 }
 
 // Omits const and ref types, be careful with those
-std::shared_ptr<TIDVariableType> LeastCommonType(const std::shared_ptr<TIDVariableType> & lhs,
-    const std::shared_ptr<TIDVariableType> & rhs) {
+std::shared_ptr<TIDVariableType> LeastCommonType(std::shared_ptr<TIDVariableType> lhs,
+    std::shared_ptr<TIDVariableType> rhs) {
+  if (lhs == nullptr || rhs == nullptr) return {};
+  lhs = SetParamsToType(lhs, false, false);
+  rhs = SetParamsToType(rhs, false, false);
   if (lhs == rhs) return lhs;
   if (CanCastLossless(lhs, rhs)) return rhs;
   if (CanCastLossless(rhs, lhs)) return lhs;
-  if (lhs->GetType() != VariableType::kPrimitive || rhs->GetType() != VariableType::kPrimitive)
+  if (lhs->GetType() != VariableType::kPrimitive || rhs->GetType() != VariableType::kPrimitive || !CanCast(lhs, rhs))
     return {};
   PrimitiveVariableType type1 = std::static_pointer_cast<TIDPrimitiveVariableType>(lhs)->GetPrimitiveType();
   PrimitiveVariableType type2 = std::static_pointer_cast<TIDPrimitiveVariableType>(rhs)->GetPrimitiveType();

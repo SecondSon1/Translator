@@ -65,16 +65,16 @@ std::shared_ptr<TIDVariableType> Copy(const std::shared_ptr<TIDVariableType> & t
       ans = std::make_shared<TIDArrayVariableType>(*std::static_pointer_cast<TIDArrayVariableType>(type));
       break;
     case VariableType::kComplex:
-      ans = std::make_shared<TIDComplexVariableType>(*type);
+      ans = std::make_shared<TIDComplexVariableType>(*std::static_pointer_cast<TIDComplexVariableType>(type));
       break;
     case VariableType::kFunction:
-      ans = std::make_shared<TIDFunctionVariableType>(*type);
+      ans = std::make_shared<TIDFunctionVariableType>(*std::static_pointer_cast<TIDFunctionVariableType>(type));
       break;
     case VariableType::kPointer:
-      ans = std::make_shared<TIDPointerVariableType>(*type);
+      ans = std::make_shared<TIDPointerVariableType>(*std::static_pointer_cast<TIDPointerVariableType>(type));
       break;
     case VariableType::kPrimitive:
-      ans = std::make_shared<TIDPrimitiveVariableType>(*type);
+      ans = std::make_shared<TIDPrimitiveVariableType>(*std::static_pointer_cast<TIDPrimitiveVariableType>(type));
       break;
   }
   return ans;
@@ -180,7 +180,7 @@ void TID::RemoveScope() {
 }
 void TID::AddComplexStruct(const Lexeme & lexeme, const std::wstring & name,
     const std::shared_ptr<TIDVariableType> & complex_struct) {
-  if (std::dynamic_pointer_cast<TIDComplexVariableType>(complex_struct) == nullptr)
+  if (!complex_struct || complex_struct->GetType() != VariableType::kComplex)
     throw NotComplexStructError();
   if (nodes_.back().complex_structs_.count(name) || nodes_.back().variables_.count(name))
     throw ConflictingNames(lexeme);

@@ -19,8 +19,8 @@ class TIDVariableType {
 
   bool IsConst() const { return const_; }
   bool IsReference() const { return ref_; }
-  void SetConst(bool val) { ref_ = val; }
-  void SetReference(bool val) { const_ = val; }
+  void SetConst(bool val) { const_ = val; }
+  void SetReference(bool val) { ref_ = val; }
 
  protected:
   TIDVariableType(VariableType type, uint32_t size)

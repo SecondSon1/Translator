@@ -217,6 +217,34 @@ class LoopInstructionsOutsideOfLoop : public SemanticsAnalysisError {
   }
 };
 
+class VoidNotExpected : public SemanticsAnalysisError {
+ public:
+  VoidNotExpected(const Lexeme & lexeme) : SemanticsAnalysisError(lexeme) {}
+
+  const char* what() const noexcept override {
+    return "Void is not applicable here";
+  }
+};
+
+class FunctionParameterListDoesNotMatch : public SemanticsAnalysisError {
+ public:
+  FunctionParameterListDoesNotMatch(const Lexeme & lexeme,
+      const std::shared_ptr<TIDFunctionVariableType> & function_type,
+      const std::vector<std::shared_ptr<TIDVariableType>> & provided)
+    : SemanticsAnalysisError(lexeme), function_type_(function_type), provided_(provided) {}
+
+  std::shared_ptr<TIDFunctionVariableType> GetFunctionType() const { return function_type_; }
+  std::vector<std::shared_ptr<TIDVariableType>> GetProvided() const { return provided_; }
+
+  const char* what() const noexcept override {
+    return "Calling a function with incorrect parameter list";
+  }
+
+ private:
+  std::shared_ptr<TIDFunctionVariableType> function_type_;
+  std::vector<std::shared_ptr<TIDVariableType>> provided_;
+};
+
 // ======================================
 // === Our Errors (not user's code's) ===
 // ======================================
@@ -252,4 +280,18 @@ class OperatorTypeMismatch : public std::exception {
 
  private:
   OperatorType expected_, got_;
+};
+
+class ExpectedFunction : public std::exception {
+ public:
+  ExpectedFunction(const std::shared_ptr<TIDVariableType> got) : got_(got) {}
+
+  std::shared_ptr<TIDVariableType> GetGot() const { return got_; }
+
+  const char* what() const noexcept override {
+    return "Not a function was passed";
+  }
+
+ private:
+  std::shared_ptr<TIDVariableType> got_;
 };
