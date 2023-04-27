@@ -353,6 +353,9 @@ std::pair<std::vector<std::pair<std::wstring, std::shared_ptr<TIDVariableType>>>
   bool started_default = false;
   std::vector<std::pair<std::wstring, std::shared_ptr<TIDVariableType>>> params, default_params;
 
+  if (IsLexeme(LexemeType::kParenthesis, L")"))
+    return { params, default_params };
+
   while (true) {
     auto var = VariableParameter();
     if (IsLexeme(LexemeType::kOperator, L"="))
@@ -734,9 +737,9 @@ std::shared_ptr<TIDVariableType> Priority7() {
   auto type = Priority8();
   while (IsLexeme(LexemeType::kOperator, L"==")
     || IsLexeme(LexemeType::kOperator, L"!=")) {
+    BinaryOperator op = IsLexeme(LexemeType::kOperator, L"==") ? BinaryOperator::kEqual : BinaryOperator::kNotEqual;
     GetNext();
     auto new_type = Priority8();
-    BinaryOperator op = IsLexeme(LexemeType::kOperator, L"==") ? BinaryOperator::kEqual : BinaryOperator::kNotEqual;
     type = BinaryOperation(type, op, new_type, lexeme);
   }
   return type;
@@ -748,8 +751,6 @@ std::shared_ptr<TIDVariableType> Priority8() {
     || IsLexeme(LexemeType::kOperator, L"<=")
     || IsLexeme(LexemeType::kOperator, L">")
     || IsLexeme(LexemeType::kOperator, L">=")) {
-    GetNext();
-    auto new_type = Priority9();
     BinaryOperator op = BinaryOperator::kLess;
     if (IsLexeme(LexemeType::kOperator, L"<="))
       op = BinaryOperator::kLessOrEqual;
@@ -757,6 +758,8 @@ std::shared_ptr<TIDVariableType> Priority8() {
       op = BinaryOperator::kMore;
     else if (IsLexeme(LexemeType::kOperator, L">="))
       op = BinaryOperator::kMoreOrEqual;
+    GetNext();
+    auto new_type = Priority9();
     type = BinaryOperation(type, op, new_type, lexeme);
   }
   return type;
@@ -766,9 +769,10 @@ std::shared_ptr<TIDVariableType> Priority9() {
   auto type = Priority10();
   while (IsLexeme(LexemeType::kOperator, L"<<")
     || IsLexeme(LexemeType::kOperator, L">>")) {
+    BinaryOperator op = IsLexeme(LexemeType::kOperator, L"<<") ? BinaryOperator::kBitwiseShiftLeft
+        : BinaryOperator::kBitwiseShiftRight;
     GetNext();
     auto new_type = Priority10();
-    BinaryOperator op = IsLexeme(LexemeType::kOperator, L"<<") ? BinaryOperator::kBitwiseShiftLeft : BinaryOperator::kBitwiseShiftRight;
     type = BinaryOperation(type, op, new_type, lexeme);
   }
   return type;
@@ -778,9 +782,10 @@ std::shared_ptr<TIDVariableType> Priority10() {
   auto type = Priority11();
   while (IsLexeme(LexemeType::kOperator, L"+")
     || IsLexeme(LexemeType::kOperator, L"-")) {
+    BinaryOperator op = IsLexeme(LexemeType::kOperator, L"+") ? BinaryOperator::kAddition
+        : BinaryOperator::kSubtraction;
     GetNext();
     auto new_type = Priority11();
-    BinaryOperator op = IsLexeme(LexemeType::kOperator, L"+") ? BinaryOperator::kAddition : BinaryOperator::kSubtraction;
     type = BinaryOperation(type, op, new_type, lexeme);
   }
   return type;
@@ -791,14 +796,14 @@ std::shared_ptr<TIDVariableType> Priority11() {
   while (IsLexeme(LexemeType::kOperator, L"*")
     || IsLexeme(LexemeType::kOperator, L"/")
     || IsLexeme(LexemeType::kOperator, L"%")) {
-    GetNext();
-    auto new_type = Priority12();
     BinaryOperator op = BinaryOperator::kModulus;
     if (IsLexeme(LexemeType::kOperator, L"*")) {
       op = BinaryOperator::kMultiplication;
     } else if (IsLexeme(LexemeType::kOperator, L"/")) {
       op = BinaryOperator::kDivision;
     }
+    GetNext();
+    auto new_type = Priority12();
     type = BinaryOperation(type, op, new_type, lexeme);
   }
   return type;
@@ -845,7 +850,7 @@ std::shared_ptr<TIDVariableType> Priority13() {
         throw TypeNotIndexed(lexeme);
       GetNext();
       auto index_type = Expression();
-      ExpectToBeAbleToCastTo(type, GetPrimitiveVariableType(PrimitiveVariableType::kUint32));
+      ExpectToBeAbleToCastTo(index_type, GetPrimitiveVariableType(PrimitiveVariableType::kUint32));
       Expect(LexemeType::kBracket, L"]");
       GetNext();
       type = std::static_pointer_cast<TIDArrayVariableType>(type)->GetValue();
@@ -871,7 +876,7 @@ std::shared_ptr<TIDVariableType> Priority13() {
       GetNext();
       type = UnaryPostfixOperation(type, op, lexeme);
     } else
-        break;
+      break;
   }
   return type;
 }
