@@ -4,6 +4,11 @@
 #include <string>
 #include "TID.hpp"
 
+constexpr uint8_t kOperatorCount = 44;
+constexpr uint8_t kUnaryPrefixOperatorCount = 10;
+constexpr uint8_t kUnaryPostfixOperatorCount = 2;
+constexpr uint8_t kBinaryOperatorCount = 32;
+
 enum class OperatorType : uint8_t {
   kUnaryPrefix, kUnaryPostfix, kBinary
 };
@@ -92,10 +97,3 @@ std::wstring ToString(BinaryOperator op);
 UnaryPrefixOperator UnaryPrefixOperatorByString(const std::wstring & str);
 UnaryPostfixOperator UnaryPostfixOperatorByString(const std::wstring & str);
 BinaryOperator BinaryOperatorByString(const std::wstring & str);
-
-bool CanCastLossless(const std::shared_ptr<TIDVariableType> & from, const std::shared_ptr<TIDVariableType> & to);
-bool CanCast(const std::shared_ptr<TIDVariableType> & from, const std::shared_ptr<TIDVariableType> & to);
-
-std::shared_ptr<TIDVariableType> UnaryPrefixOperation(UnaryPrefixOperator op, const std::shared_ptr<TIDVariableType> & type, const Lexeme & lexeme);
-std::shared_ptr<TIDVariableType> UnaryPostfixOperation(const std::shared_ptr<TIDVariableType> & type, UnaryPostfixOperator op, const Lexeme & lexeme);
-std::shared_ptr<TIDVariableType> BinaryOperation(const std::shared_ptr<TIDVariableType> & lhs, BinaryOperator op, const std::shared_ptr<TIDVariableType> & rhs);

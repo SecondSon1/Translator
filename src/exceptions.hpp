@@ -151,7 +151,43 @@ class TypeNotIterable : public SemanticsAnalysisError {
   TypeNotIterable(const Lexeme & lexeme) : SemanticsAnalysisError(lexeme) {}
 
   const char* what() const noexcept override {
-    return "Provided type is not iterable";
+    return "Provided type is not iterable (not an array)";
+  }
+};
+
+class TypeNotIndexed : public SemanticsAnalysisError {
+ public:
+  TypeNotIndexed(const Lexeme & lexeme) : SemanticsAnalysisError(lexeme) {}
+
+  const char* what() const noexcept override {
+    return "Provided type is not indexed (not an array)";
+  }
+};
+
+class TypeNotCallable : public SemanticsAnalysisError {
+ public:
+  TypeNotCallable(const Lexeme & lexeme) : SemanticsAnalysisError(lexeme) {}
+
+  const char* what() const noexcept override {
+    return "Provided type is not callable (not a function)";
+  }
+};
+
+class TypeNoMembers : public SemanticsAnalysisError {
+ public:
+  TypeNoMembers(const Lexeme & lexeme) : SemanticsAnalysisError(lexeme) {}
+
+  const char* what() const noexcept override {
+    return "Provided type does not have members, attempting member access";
+  }
+};
+
+class TypeUnknownMember : public SemanticsAnalysisError {
+ public:
+  TypeUnknownMember(const Lexeme & lexeme) : SemanticsAnalysisError(lexeme) {}
+
+  const char* what() const noexcept override {
+    return "Member does not exist on given type";
   }
 };
 
@@ -171,6 +207,15 @@ class TypeMismatch : public SemanticsAnalysisError {
   std::shared_ptr<TIDVariableType> expected_, got_;
 };
 
+
+class LoopInstructionsOutsideOfLoop : public SemanticsAnalysisError {
+ public:
+  LoopInstructionsOutsideOfLoop(const Lexeme & lexeme) : SemanticsAnalysisError(lexeme) {}
+
+  const char* what() const noexcept override {
+    return "Continue/break outside of loop";
+  }
+};
 
 // ======================================
 // === Our Errors (not user's code's) ===

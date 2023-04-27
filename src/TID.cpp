@@ -48,31 +48,15 @@ PrimitiveVariableType FromWstringToPrimitiveType(const std::wstring & str) {
   else return PrimitiveVariableType::kUnknown;
 }
 
-std::shared_ptr<TIDVariableType> GetPrimitiveVariableType(PrimitiveVariableType type) {
-  static std::map<PrimitiveVariableType, std::shared_ptr<TIDVariableType>> cache;
-  if (!cache.count(type)) {
-    cache[type] = std::make_shared<TIDPrimitiveVariableType>(TIDPrimitiveVariableType::Guard(0), type);
-  }
-  return cache[type];
+std::shared_ptr<TIDVariableType> TIDComplexVariableType::GetField(std::wstring & name) const {
+  for (auto [field_name, value] : contents_)
+    if (field_name == name)
+      return value;
+  return { };
 }
 
 std::map<std::shared_ptr<TIDVariableType>, std::shared_ptr<TIDVariableType>> origin;
 std::map<std::shared_ptr<TIDVariableType>, std::shared_ptr<TIDVariableType>> const_non_ref, const_ref, non_const_ref;
-
-std::shared_ptr<TIDVariableType> DerivePointerFromType(const std::shared_ptr<TIDVariableType> & type) {
-  static std::map<std::shared_ptr<TIDVariableType>, std::shared_ptr<TIDVariableType>> cache;
-  if (!cache.count(type)) {
-    cache[type] = std::make_shared<TIDPointerVariableType>(TIDPointerVariableType::Guard(0), type);
-  }
-  return cache[type];
-}
-
-std::shared_ptr<TIDVariableType> DeriveArrayFromType(const std::shared_ptr<TIDVariableType> & type) {
-  static std::map<std::shared_ptr<TIDVariableType>, std::shared_ptr<TIDVariableType>> cache;
-  if (!cache.count(type))
-    cache[type] = std::make_shared<TIDArrayVariableType>(TIDArrayVariableType::Guard(0), type);
-  return cache[type];
-}
 
 std::shared_ptr<TIDVariableType> Copy(const std::shared_ptr<TIDVariableType> & type) {
   std::shared_ptr<TIDVariableType> ans;
@@ -104,12 +88,44 @@ void CreateIfNecessary(const std::shared_ptr<TIDVariableType> & type) {
   const_ref_type->SetConst(true); const_ref_type->SetReference(true);
   const_non_ref_type->SetConst(true);
   non_const_ref_type->SetReference(true);
+  origin[type] = type;
   origin[const_ref_type] = type;
   origin[const_non_ref_type] = type;
   origin[non_const_ref_type] = type;
   const_ref[type] = const_ref_type;
   const_non_ref[type] = const_non_ref_type;
   non_const_ref[type] = non_const_ref_type;
+}
+
+
+std::shared_ptr<TIDVariableType> GetPrimitiveVariableType(PrimitiveVariableType type) {
+  static std::map<PrimitiveVariableType, std::shared_ptr<TIDVariableType>> cache;
+  if (!cache.count(type)) {
+    cache[type] = std::make_shared<TIDPrimitiveVariableType>(TIDPrimitiveVariableType::Guard(0), type);
+    CreateIfNecessary(cache[type]);
+  }
+  return cache[type];
+}
+
+
+std::shared_ptr<TIDVariableType> DerivePointerFromType(const std::shared_ptr<TIDVariableType> & type) {
+  static std::map<std::shared_ptr<TIDVariableType>, std::shared_ptr<TIDVariableType>> cache;
+  if (!type->IsConst() && !type->IsReference()) CreateIfNecessary(type);
+  if (!cache.count(type)) {
+    cache[type] = std::make_shared<TIDPointerVariableType>(TIDPointerVariableType::Guard(0), origin[type]);
+    CreateIfNecessary(cache[type]);
+  }
+  return SetParamsToType(cache[type], type->IsConst(), type->IsReference());
+}
+
+std::shared_ptr<TIDVariableType> DeriveArrayFromType(const std::shared_ptr<TIDVariableType> & type) {
+  static std::map<std::shared_ptr<TIDVariableType>, std::shared_ptr<TIDVariableType>> cache;
+  if (!type->IsConst() && !type->IsReference()) CreateIfNecessary(type);
+  if (!cache.count(type)) {
+    cache[type] = std::make_shared<TIDArrayVariableType>(TIDArrayVariableType::Guard(0), origin[type]);
+    CreateIfNecessary(cache[type]);
+  }
+  return SetParamsToType(cache[type], type->IsConst(), type->IsReference());
 }
 
 std::shared_ptr<TIDVariableType> GetTypeWithParameters(const std::shared_ptr<TIDVariableType> & type, bool _const, bool _ref) {
@@ -129,13 +145,28 @@ std::shared_ptr<TIDVariableType> GetTypeWithParameters(const std::shared_ptr<TID
 }
 
 std::shared_ptr<TIDVariableType> SetConstToType(const std::shared_ptr<TIDVariableType> & type, bool _const) {
-  if (!type->IsConst() && !type->IsReference()) CreateIfNecessary(type);
-  return GetTypeWithParameters(type, _const, type->IsReference());
+  return SetParamsToType(type, _const, type->IsReference());
 }
 
 std::shared_ptr<TIDVariableType> SetReferenceToType(const std::shared_ptr<TIDVariableType> & type, bool _ref) {
+  return SetParamsToType(type, type->IsConst(), _ref);
+}
+
+std::shared_ptr<TIDVariableType> SetParamsToType(const std::shared_ptr<TIDVariableType> & type, bool _const, bool _ref) {
   if (!type->IsConst() && !type->IsReference()) CreateIfNecessary(type);
-  return GetTypeWithParameters(type, type->IsConst(), _ref);
+  return GetTypeWithParameters(type, _const, _ref);
+}
+
+std::vector<std::shared_ptr<TIDVariableType>> GetDerivedTypes(const std::shared_ptr<TIDVariableType> & type) {
+  std::vector<std::shared_ptr<TIDVariableType>> result;
+  result.push_back(type);
+  if (type->IsReference())
+    result.push_back(SetReferenceToType(type, false));
+  if (!type->IsConst())
+    result.push_back(SetConstToType(type, true));
+  if (type->IsReference() && !type->IsConst())
+    result.push_back(SetParamsToType(type, true, false));
+  return result;
 }
 
 void TID::AddScope() {

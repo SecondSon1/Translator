@@ -35,11 +35,17 @@ class TIDVariableType {
 
 // if you change this list you need to change another few
 // parameters in operators.cpp in casting section
-// TODO: work around c++'s dumb header file includes
+constexpr uint8_t kPrimitiveVariableTypeCount = 12;
 enum class PrimitiveVariableType : uint8_t {
   kInt8 = 0, kInt16 = 1, kInt32 = 2, kInt64 = 3,
   kUint8 = 4, kUint16 = 5, kUint32 = 6, kUint64 = 7,
   kF32 = 8, kF64 = 9, kBool = 10, kChar = 11, kUnknown = 12
+};
+constexpr PrimitiveVariableType types[] = {
+  PrimitiveVariableType::kInt8, PrimitiveVariableType::kInt16, PrimitiveVariableType::kInt32,
+  PrimitiveVariableType::kInt64, PrimitiveVariableType::kUint8, PrimitiveVariableType::kUint16,
+  PrimitiveVariableType::kUint32, PrimitiveVariableType::kUint64, PrimitiveVariableType::kF32,
+  PrimitiveVariableType::kF64, PrimitiveVariableType::kBool, PrimitiveVariableType::kChar
 };
 
 uint32_t GetSizeOfPrimitive(const PrimitiveVariableType & type);
@@ -74,6 +80,8 @@ class TIDComplexVariableType : public TIDVariableType {
   }
 
   const std::vector<std::pair<std::wstring, std::shared_ptr<TIDVariableType>>> & GetContents() const { return contents_; }
+
+  std::shared_ptr<TIDVariableType> GetField(std::wstring & name) const;
 
  private:
   std::vector<std::pair<std::wstring, std::shared_ptr<TIDVariableType>>> contents_;
@@ -131,8 +139,12 @@ class TIDArrayVariableType : public TIDVariableType {
 std::shared_ptr<TIDVariableType> GetPrimitiveVariableType(PrimitiveVariableType type);
 std::shared_ptr<TIDVariableType> DerivePointerFromType(const std::shared_ptr<TIDVariableType> & type);
 std::shared_ptr<TIDVariableType> DeriveArrayFromType(const std::shared_ptr<TIDVariableType> & type);
+
+std::shared_ptr<TIDVariableType> SetParamsToType(const std::shared_ptr<TIDVariableType> & type, bool _const, bool _ref);
 std::shared_ptr<TIDVariableType> SetConstToType(const std::shared_ptr<TIDVariableType> & type, bool _const);
 std::shared_ptr<TIDVariableType> SetReferenceToType(const std::shared_ptr<TIDVariableType> & type, bool _ref);
+
+std::vector<std::shared_ptr<TIDVariableType>> GetDerivedTypes(const std::shared_ptr<TIDVariableType> & type);
 
 class TID {
  public:
