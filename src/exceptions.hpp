@@ -96,6 +96,15 @@ class UnexpectedLexeme : public SyntaxAnalysisError {
   LexemeType expected_;
 };
 
+class ExpectedExpression : public SyntaxAnalysisError {
+ public:
+  ExpectedExpression(const Lexeme & lexeme) : SyntaxAnalysisError(lexeme) {}
+
+  const char* what() const noexcept override {
+    return "Expression expected";
+  }
+};
+
 // =================================
 // === Semantics analysis errors ===
 // =================================

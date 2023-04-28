@@ -166,9 +166,10 @@ std::shared_ptr<TIDVariableType> UnaryPostfixOperation(const std::shared_ptr<TID
 std::shared_ptr<TIDVariableType> BinaryOperation(const std::shared_ptr<TIDVariableType> & lhs,
     BinaryOperator op, const std::shared_ptr<TIDVariableType> & rhs, const Lexeme & lexeme) {
   if (!set_up_binary) SetUpBinaryOperations();
+  auto lct = LeastCommonType(lhs, rhs);
+  if (!lct) throw UnknownOperator(lexeme, { op });
   auto derivable_lhs = GetDerivedTypes(lhs);
   auto derivable_rhs = GetDerivedTypes(rhs);
-  auto lct = LeastCommonType(lhs, rhs);
   for (auto d_lhs : derivable_lhs) {
     for (auto d_rhs : derivable_rhs) {
       auto lhs_lct = SetParamsToType(lct, d_lhs->IsConst(), d_lhs->IsReference());

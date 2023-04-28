@@ -165,7 +165,7 @@ class TID {
   std::shared_ptr<const TIDVariableType> GetVariable(const std::wstring & name) const {
     for (size_t scope_index = nodes_.size() - 1; ~scope_index; --scope_index)
       if (nodes_[scope_index].variables_.count(name))
-        return nodes_[scope_index].variables_.at(name);
+        return SetReferenceToType(nodes_[scope_index].variables_.at(name), true);
     // Not found, returning empty variable
     return {};
   }

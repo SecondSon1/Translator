@@ -1,4 +1,8 @@
-int64 x = 0;
-for (int32 i = 0; i < 100; ++i) {
-    x += i;
+struct hello {
+    f32 float = 0.5;
+}
+hello h;
+
+for (int32 x = 0; x < 10; ++x) {
+    h.float *= x;
 }

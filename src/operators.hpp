@@ -81,6 +81,8 @@ class Operator {
   UnaryPostfixOperator GetUnaryPostfixOperator() const;
   BinaryOperator GetBinaryOperator() const;
 
+  std::wstring ToString() const;
+
  private:
   OperatorType type_;
   union {

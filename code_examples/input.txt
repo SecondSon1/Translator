@@ -2,6 +2,15 @@ if (false) {
     bool a = 1;
 }
 
+int32 min(int32 x, int32 y) {
+    if (x < y)
+        return x;
+    else
+        return y;
+}
+
+const int32 INF = 1000000007;
+
 const int32 N = 1 << 20;
 int32 segm[N * 2];
 void Build() {
@@ -14,7 +23,7 @@ void Build() {
 }
 
 int32 Get(int32 l, int32 r, int32 v=1, int32 vl=0, int32 vr=N) {
-  if (l >= vr || vl >= r) { return return INF; }
+  if (l >= vr || vl >= r) { return INF; }
   if (l <= vl && vr <= r) { return segm[v]; }
   int32 vm = (vl + vr) >> 1;
   return min(Get(l, r, v << 1, vl, vm), Get(l, r, v << 1 | 1, vm, vr));
@@ -32,6 +41,7 @@ void Update(int32 ind, int32 val, int32 v=1, int32 vl=0, int32 vr=N) {
 
 int32 main() {
   f32 x = 2.0;
-  cout << "yo \"mr. white\"\\" << endl;
+  Build();
+  int64 ans = Get(0, 1000);
   return 0;
 }

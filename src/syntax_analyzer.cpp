@@ -4,6 +4,7 @@
 #include "TID.hpp"
 #include "operators.hpp"
 #include <memory>
+#include <string>
 #include <vector>
 #include "casts.hpp"
 #include "operations.hpp"
@@ -85,6 +86,7 @@ void Action();
 void Block();
 void Keyword();
 std::shared_ptr<TIDVariableType> Expression();
+std::shared_ptr<TIDVariableType> EpsExpression();
 void Struct();
 std::pair<std::wstring, std::shared_ptr<TIDVariableType>> VariableIdentifier(std::shared_ptr<TIDVariableType> & type);
 std::vector<std::pair<std::wstring, std::shared_ptr<TIDVariableType>>> Definition();
@@ -92,8 +94,8 @@ void DefinitionAddToScope();
 std::pair<std::wstring, std::shared_ptr<TIDVariableType>> VariableParameter();
 std::pair<std::vector<std::pair<std::wstring, std::shared_ptr<TIDVariableType>>>,
   std::vector<std::pair<std::wstring, std::shared_ptr<TIDVariableType>>>> ParameterList();
-std::pair<std::vector<std::pair<std::wstring, std::shared_ptr<TIDVariableType>>>,
-  std::vector<std::pair<std::wstring, std::shared_ptr<TIDVariableType>>>> Function();
+std::shared_ptr<TIDVariableType> Function(const std::wstring & name,
+                                          const std::shared_ptr<TIDVariableType> & return_type);
 std::shared_ptr<TIDVariableType> Type();
 std::shared_ptr<TIDVariableType> TypeNoConst();
 void If();
@@ -147,7 +149,7 @@ void Action() {
   else if (IsLexeme(LexemeType::kPunctuation, L"{"))
     Block();
   else {
-    Expression();
+    EpsExpression();
     Expect(LexemeType::kPunctuation, L";");
     GetNext();
   }
@@ -197,9 +199,11 @@ void Keyword() {
     Break();
   else if (IsLexeme(L"continue"))
     Continue();
-  else if (IsLexeme(L"struct"))
+  else if (IsLexeme(L"struct")) {
+    tid.RemoveScope();
     Struct();
-  else if (IsLexeme(L"try"))
+    return;
+  } else if (IsLexeme(L"try"))
     Try();
   else if (IsLexeme(L"throw"))
     Throw();
@@ -270,7 +274,11 @@ std::pair<std::wstring, std::shared_ptr<TIDVariableType>> VariableIdentifier(std
     ptr = DerivePointerFromType(ptr);
   while (IsLexeme(LexemeType::kBracket, L"[")) {
     GetNext();
-    Expression();
+    if (!IsLexeme(LexemeType::kBracket, L"]")) {
+      auto ind_type = Expression();
+      ExpectToBeAbleToCastTo(ind_type,
+        SetConstToType(GetPrimitiveVariableType(PrimitiveVariableType::kUint32), true));
+    }
     Expect(LexemeType::kBracket, L"]");
     GetNext();
     ptr = DeriveArrayFromType(ptr);
@@ -288,23 +296,20 @@ std::vector<std::pair<std::wstring, std::shared_ptr<TIDVariableType>>> Definitio
     name = lexeme.GetValue();
     GetNext();
     if (IsLexeme(LexemeType::kParenthesis)) {
-      scope_return_type.push_back(type);
-      auto [params, default_params] = Function();
-      std::vector<std::shared_ptr<TIDVariableType>> params_tid(params.size()), default_params_tid(default_params.size());
-      for (size_t i = 0; i < params.size(); ++i) params_tid[i] = params[i].second;
-      for (size_t i = 0; i < default_params.size(); ++i) default_params_tid[i] = default_params[i].second;
-      scope_return_type.pop_back();
-      std::shared_ptr<TIDVariableType> func_type = std::make_shared<TIDFunctionVariableType>(type, params_tid, default_params_tid);
+      std::shared_ptr<TIDVariableType> func_type = Function(name, type);
       return { { name, func_type } };
     }
 
     if (type == nullptr)
       throw VoidNotExpected(lexeme);
-    var_type = SetReferenceToType(type, true);
+    var_type = type;
     while (IsLexeme(LexemeType::kBracket, L"[")) {
       GetNext();
-      auto ind_type = Expression();
-      ExpectToBeAbleToCastTo(ind_type, GetPrimitiveVariableType(PrimitiveVariableType::kUint32));
+      if (!IsLexeme(LexemeType::kBracket, L"]")) {
+        auto ind_type = Expression();
+        ExpectToBeAbleToCastTo(ind_type,
+          SetConstToType(GetPrimitiveVariableType(PrimitiveVariableType::kUint32), true));
+      }
       Expect(LexemeType::kBracket, L"]");
       GetNext();
       var_type = DeriveArrayFromType(var_type);
@@ -322,7 +327,6 @@ std::vector<std::pair<std::wstring, std::shared_ptr<TIDVariableType>>> Definitio
   while (IsLexeme(LexemeType::kPunctuation, L",")) {
     GetNext();
     tie(name, var_type) = VariableIdentifier(type);
-    var_type = SetReferenceToType(var_type, true);
     result.emplace_back(name, var_type);
     if (IsLexeme(LexemeType::kOperator, L"=")) {
       GetNext();
@@ -376,30 +380,40 @@ std::pair<std::vector<std::pair<std::wstring, std::shared_ptr<TIDVariableType>>>
   return { params, default_params };
 }
 
-std::pair<std::vector<std::pair<std::wstring, std::shared_ptr<TIDVariableType>>>,
-  std::vector<std::pair<std::wstring, std::shared_ptr<TIDVariableType>>>> Function() {
+std::shared_ptr<TIDVariableType> Function(const std::wstring & name,
+                                          const std::shared_ptr<TIDVariableType> & return_type) {
   debug("Function");
   Expect(LexemeType::kParenthesis, L"(");
   GetNext();
   auto parameters = ParameterList();
   Expect(LexemeType::kParenthesis, L")");
   GetNext();
-  // Check if list of arguments is ok
+
+  std::vector<std::shared_ptr<TIDVariableType>>
+      params_tid(parameters.first.size()), default_params_tid(parameters.second.size());
+  for (size_t i = 0; i < parameters.first.size(); ++i) params_tid[i] = parameters.first[i].second;
+  for (size_t i = 0; i < parameters.second.size(); ++i) default_params_tid[i] = parameters.second[i].second;
+  std::shared_ptr<TIDVariableType> func_type =
+      std::make_shared<TIDFunctionVariableType>(return_type, params_tid, default_params_tid);
+
   if (!IsLexeme(LexemeType::kPunctuation, L";")) {
     tid.AddScope();
-    for (auto & [name, type] : parameters.first)
-      tid.AddVariable(lexeme, name, type);
-    for (auto & [name, type] : parameters.second)
-      tid.AddVariable(lexeme, name, type);
+    scope_return_type.push_back(return_type);
+    for (auto & [var_name, var_type] : parameters.first)
+      tid.AddVariable(lexeme, var_name, var_type);
+    for (auto & [var_name, var_type] : parameters.second)
+      tid.AddVariable(lexeme, var_name, var_type);
+    tid.AddVariable(lexeme, name, func_type);
     auto temp_value = surrounding_loop_count;
     surrounding_loop_count = 0;
     Block();
     surrounding_loop_count = temp_value;
+    scope_return_type.pop_back();
     tid.RemoveScope();
   }
   debug("Exited Function");
   // also update scope_return_type
-  return parameters;
+  return func_type;
 }
 
 std::shared_ptr<TIDVariableType> Type() {
@@ -491,7 +505,9 @@ void For() {
     ExpectToBeAbleToCastTo(type, GetPrimitiveVariableType(PrimitiveVariableType::kBool));
   Expect(LexemeType::kPunctuation, L";");
   GetNext();
-  EpsExpression();
+  if (!IsLexeme(LexemeType::kParenthesis, L")")) {
+    Expression();
+  }
   Expect(LexemeType::kParenthesis, L")");
   GetNext();
   ++surrounding_loop_count;
@@ -631,10 +647,11 @@ void FunctionCall(const std::shared_ptr<TIDVariableType> & type) {
   size_t param_index = 0, default_param_index = 0;
   for (const std::shared_ptr<TIDVariableType> & provided_type : provided) {
     if (param_index == params.size()) {
-      if (default_param_index == default_params.size() || !CanCast(provided_type, default_params[default_param_index++]))
+      if (default_param_index == default_params.size() || !CanCast(
+          SetConstToType(provided_type, false), default_params[default_param_index++]))
         throw FunctionParameterListDoesNotMatch(lexeme, func_type, provided);
     } else {
-      if (!CanCast(provided_type, params[param_index++]))
+      if (!CanCast(SetConstToType(provided_type, false), params[param_index++]))
         throw FunctionParameterListDoesNotMatch(lexeme, func_type, provided);
     }
   }
@@ -849,8 +866,10 @@ std::shared_ptr<TIDVariableType> Priority13() {
       if (!type || type->GetType() != VariableType::kArray)
         throw TypeNotIndexed(lexeme);
       GetNext();
-      auto index_type = Expression();
-      ExpectToBeAbleToCastTo(index_type, GetPrimitiveVariableType(PrimitiveVariableType::kUint32));
+      if (!IsLexeme(LexemeType::kBracket, L"]")) {
+        auto index_type = Expression();
+        ExpectToBeAbleToCastTo(index_type, GetPrimitiveVariableType(PrimitiveVariableType::kUint32));
+      }
       Expect(LexemeType::kBracket, L"]");
       GetNext();
       type = std::static_pointer_cast<TIDArrayVariableType>(type)->GetValue();
@@ -869,7 +888,7 @@ std::shared_ptr<TIDVariableType> Priority13() {
       if (new_type == nullptr)
         throw TypeUnknownMember(lexeme);
       GetNext();
-      type = new_type;
+      type = SetParamsToType(new_type, type->IsConst(), true);
     } else if (IsLexeme(LexemeType::kOperator, L"++") || IsLexeme(LexemeType::kOperator, L"--")) {
       UnaryPostfixOperator op = IsLexeme(LexemeType::kOperator, L"++") ? UnaryPostfixOperator::kIncrement
         : UnaryPostfixOperator::kDecrement;
@@ -882,13 +901,20 @@ std::shared_ptr<TIDVariableType> Priority13() {
 }
 
 std::shared_ptr<TIDVariableType> Priority14() {
-  if (IsLexeme(LexemeType::kNumericLiteral)
+  /*IsLexeme(LexemeType::kNumericLiteral)
     || IsLexeme(LexemeType::kIdentifier)
     || IsLexeme(LexemeType::kStringLiteral)
-    || IsLexeme(LexemeType::kReserved, L"true") || IsLexeme(LexemeType::kReserved, L"false")) {
+    || IsLexeme(LexemeType::kReserved, L"true") || IsLexeme(LexemeType::kReserved, L"false")*/
+  if (IsLexeme(LexemeType::kParenthesis, L"(")) {
+    GetNext();
+    auto type = Expression();
+    Expect(LexemeType::kParenthesis, L")");
+    GetNext();
+    return type;
+  } else {
     std::shared_ptr<TIDVariableType> type;
     if (IsLexeme(LexemeType::kNumericLiteral))
-      type = SetConstToType(GetPrimitiveVariableType(lexeme.GetValue().find(L".") == -1 ?
+      type = SetConstToType(GetPrimitiveVariableType(lexeme.GetValue().find(L".") == std::wstring::npos ?
           PrimitiveVariableType::kInt8 : PrimitiveVariableType::kF32), true);
     else if (IsLexeme(LexemeType::kIdentifier)) {
       type = tid.GetVariable(lexeme.GetValue());
@@ -898,14 +924,8 @@ std::shared_ptr<TIDVariableType> Priority14() {
       type = SetConstToType(DeriveArrayFromType(GetPrimitiveVariableType(PrimitiveVariableType::kChar)), true);
     else
       type = SetConstToType(GetPrimitiveVariableType(PrimitiveVariableType::kBool), true);
-    GetNext();
-    return type;
-  }
-  else {
-    Expect(LexemeType::kParenthesis, L"(");
-    GetNext();
-    auto type = Expression();
-    Expect(LexemeType::kParenthesis, L")");
+    if (!type)
+      throw ExpectedExpression(lexeme);
     GetNext();
     return type;
   }

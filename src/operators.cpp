@@ -103,6 +103,17 @@ void SetUpOperatorString() {
   set_up = true;
 }
 
+std::wstring Operator::ToString() const {
+  switch (type_) {
+    case OperatorType::kUnaryPrefix:
+      return ::ToString(u_pre_op_);
+    case OperatorType::kUnaryPostfix:
+      return ::ToString(u_post_op_);
+    case OperatorType::kBinary:
+      return ::ToString(bin_op_);
+  }
+}
+
 std::wstring ToString(UnaryPrefixOperator op) {
   if (!set_up) SetUpOperatorString();
   if (op == UnaryPrefixOperator::kUnknown) return L"";

@@ -64,10 +64,16 @@ void SetUpCastingPrimitives() {
     }
   }
 
+  for (uint8_t x = 0; x < kPrimitiveVariableTypeCount; ++x)
+    for (uint8_t y = 0; y < kPrimitiveVariableTypeCount; ++y)
+      can_cast[x][y] = -1;
+
   for (uint8_t x = 0; x < kPrimitiveVariableTypeCount; ++x) {
     for (PrimitiveVariableType type : up_cast[x]) {
-      can_cast[x][static_cast<uint8_t>(type)] = 0;
-      can_cast[static_cast<uint8_t>(type)][x] = 1;
+      if (can_cast[x][static_cast<uint8_t>(type)] != 0)
+        can_cast[x][static_cast<uint8_t>(type)] = 0;
+      if (can_cast[static_cast<uint8_t>(type)][x] == -1)
+        can_cast[static_cast<uint8_t>(type)][x] = 1;
     }
   }
   for (uint8_t through = 0; through < kPrimitiveVariableTypeCount; ++through) {
