@@ -1,1 +1,5 @@
-++i;
+void x(int32 arg);
+
+void x(int32 arg) {
+    arg++;
+}

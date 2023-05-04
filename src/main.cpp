@@ -3,6 +3,7 @@
 #include <string>
 #include <fstream>
 
+#include "lexeme.hpp"
 #include "lexical_analyzer.hpp"
 #include "logging.hpp"
 #include "syntax_analyzer.hpp"
@@ -16,19 +17,19 @@ void PrintHelp() {
 }
 
 int32_t main(const int argc, const char *argv[]) {
-  // Maybe it's better to create ParceArgs function
+  // Maybe it's better to create ParseArgs function
   // Or to do it in another file
   // I don't wanna to think too much
   if (argc < 2) {
-      PrintHelp();
-      return 0;
+    PrintHelp();
+    return 0;
   }
 
   std::wifstream codeFile;
   codeFile.open(argv[1]);
   if (!codeFile.is_open()) {
-      std::wcout << format::bright << color::red << "Cannot open file " << format::reset << argv[1] << std::endl;
-      return 1;
+    std::wcout << format::bright << color::red << "Cannot open file " << format::reset << argv[1] << std::endl;
+    return 1;
   }
 
   std::wstring code;
@@ -39,10 +40,19 @@ int32_t main(const int argc, const char *argv[]) {
   }
   codeFile.close();
 
-  std::vector<Lexeme> lexemes(0);
+  std::vector<Lexeme> lexemes;
   try {
-      lexemes = PerformLexicalAnalysis(code);
-      PerformSyntaxAnalysis(lexemes);
+    lexemes = PerformLexicalAnalysis(code);
+    for (Lexeme lexeme : lexemes)
+      if (lexeme.GetType() == LexemeType::kUnknown)
+        throw UnknownLexeme(lexeme.GetIndex(), lexeme.GetValue());
+    PerformSyntaxAnalysis(lexemes);
+  }
+  catch (const TypeMismatch & e) {
+    log::error(code, e);
+    std::wcout << L"Expected type " << e.GetTypeExpected()->ToString() << ", got " << e.GetTypeGot()->ToString() << "." << std::endl << std::endl;
+    std::wcout << "Terminated, " << format::bright << color::red << '1' << format::reset << " error was found" << std::endl;
+    return 69;
   }
   catch (const TranslatorError & e) {
     log::error(code, e);
@@ -50,9 +60,10 @@ int32_t main(const int argc, const char *argv[]) {
     return 2;
   }
   catch (...) {
-      std::wcout << "Something went wrong. We are sorry about it";
-      return 3;
+    std::wcout << "Something went wrong. We are sorry about it";
+    return 3;
   }
   std::wcout << color::green << format::bright << '0' << format::reset << " errors were found, compiling..." << std::endl;
+
   return 0;
 }
