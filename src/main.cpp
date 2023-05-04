@@ -48,12 +48,6 @@ int32_t main(const int argc, const char *argv[]) {
         throw UnknownLexeme(lexeme.GetIndex(), lexeme.GetValue());
     PerformSyntaxAnalysis(lexemes);
   }
-  catch (const TypeMismatch & e) {
-    log::error(code, e);
-    std::wcout << L"Expected type " << e.GetTypeExpected()->ToString() << ", got " << e.GetTypeGot()->ToString() << "." << std::endl << std::endl;
-    std::wcout << "Terminated, " << format::bright << color::red << '1' << format::reset << " error was found" << std::endl;
-    return 69;
-  }
   catch (const TranslatorError & e) {
     log::error(code, e);
     std::wcout << "Terminated, " << format::bright << color::red << '1' << format::reset << " error was found" << std::endl;

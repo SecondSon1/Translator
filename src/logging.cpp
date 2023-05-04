@@ -6,6 +6,28 @@
 #include "lexeme.hpp"
 #include "terminal_formatting.hpp"
 
+void printUnexpectedLexeme(const TranslatorError &error) {
+  const UnexpectedLexeme *unexpectedLexeme = dynamic_cast<const UnexpectedLexeme *>(&error);
+  if (unexpectedLexeme == nullptr) return;
+
+  std::wcout << format::bright << " (";
+  std::wcout << "expected: " << color::blue << ToString(unexpectedLexeme->GetExpected()) << format::reset;
+  std::wcout << format::bright << ", got: " << color::red << ToString(unexpectedLexeme->GetActual().GetType())
+             << format::reset;
+  std::wcout << format::bright << ')' << format::reset;
+}
+
+void printTypeMismatch(const TranslatorError &error) {
+  const TypeMismatch *typeMismatch = dynamic_cast<const TypeMismatch *>(&error);
+  if (typeMismatch == nullptr) return;
+
+  std::wcout << format::bright << " (";
+  std::wcout << "expected: " << color::blue << typeMismatch->GetTypeExpected()->ToString() << format::reset;
+  std::wcout << format::bright << ", got: " << color::red << typeMismatch->GetTypeGot()->ToString()
+             << format::reset;
+  std::wcout << format::bright << ')' << format::reset;
+}
+
 void log::error(const std::wstring &code, const TranslatorError &error) {
   // Getting position in file
   size_t lineIndex = 1, columnIndex = 0, lineStartIndex = 0;
@@ -20,19 +42,11 @@ void log::error(const std::wstring &code, const TranslatorError &error) {
   // Printing error info
   std::wcout << format::bright << lineIndex << ':' << columnIndex << ": ";
   std::wcout << color::red << "error: " << format::reset << format::bright << error.what() << format::reset;
-
-  // More info for UnexpectedLexeme
-  const UnexpectedLexeme *unexpectedLexeme = dynamic_cast<const UnexpectedLexeme *>(&error);
-  if (unexpectedLexeme != nullptr) {
-    std::wcout << format::bright << " (";
-    std::wcout << "expected: " << color::blue << ToString(unexpectedLexeme->GetExpected()) << format::reset;
-    std::wcout << format::bright << ", got: " << color::red << ToString(unexpectedLexeme->GetActual().GetType())
-               << format::reset;
-    std::wcout << format::bright << ')' << format::reset;
-  }
+  printUnexpectedLexeme(error);
+  printTypeMismatch(error);
   std::wcout << std::endl;
 
-  // Printing line with error
+  // Getting error lexeme type
   size_t lexemeSize = 1;
   const SyntaxAnalysisError *syntaxError = dynamic_cast<const SyntaxAnalysisError *>(&error);
   const SemanticsAnalysisError *semanticsError = dynamic_cast<const SemanticsAnalysisError *>(&error);
@@ -42,6 +56,7 @@ void log::error(const std::wstring &code, const TranslatorError &error) {
     lexemeSize = semanticsError->GetActual().GetValue().size();
   }
 
+  // Printing line with error
   for (size_t i = lineStartIndex; i < code.size() && code[i] != '\n'; ++i) {
     if (i == error.GetIndex()) std::wcout << color::background::red << color::white;
     std::wcout << code[i];
