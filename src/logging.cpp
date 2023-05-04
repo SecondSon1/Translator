@@ -42,7 +42,40 @@ void printFunctionParameterListDoesNotMatch(const TranslatorError &err) {
   if (error == nullptr) return;
 
   std::wcout << format::bright << " (" << format::reset;
-  std::wcout << format::bright << error->GetFunctionType()->ToString() << format::reset;
+  std::wcout << format::bright << "expected: " << color::blue;
+  if (error->GetFunctionType()->GetParameters().size() == 0 && error->GetFunctionType()->GetDefaultParameters().size()) {
+    std::wcout << "nothing";
+  }
+  else if (error->GetFunctionType()->GetParameters().size() > 0) {
+    std::wcout << error->GetFunctionType()->GetParameters()[0]->ToString();
+    for (size_t i = 1; i < error->GetFunctionType()->GetParameters().size(); ++i) {
+      std::wcout << ", " << error->GetFunctionType()->GetParameters()[i]->ToString();
+    }
+    std::wcout << format::italic;
+    for (size_t i = 0; i < error->GetFunctionType()->GetDefaultParameters().size(); ++i) {
+      std::wcout << ", " << error->GetFunctionType()->GetDefaultParameters()[i]->ToString();
+    }
+  }
+  else {
+    std::wcout << format::italic;
+    std::wcout << error->GetFunctionType()->GetDefaultParameters()[0]->ToString();
+    for (size_t i = 1; i < error->GetFunctionType()->GetDefaultParameters().size(); ++i) {
+      std::wcout << ", " << error->GetFunctionType()->GetDefaultParameters()[i]->ToString();
+    }
+  }
+  std::wcout << format::reset;
+
+  std::wcout << format::bright << ", got: " << color::red;
+  if (error->GetProvided().size() == 0) {
+    std::wcout << "nothing";
+  }
+  else {
+    std::wcout << error->GetProvided()[0]->ToString();
+    for (size_t i = 1; i < error->GetProvided().size(); ++i) {
+      std::wcout << ", " << error->GetProvided()[i]->ToString();
+    }
+  }
+  std::wcout << format::reset;
   std::wcout << format::bright << ')' << format::reset;
 }
 
