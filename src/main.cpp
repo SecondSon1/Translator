@@ -3,6 +3,7 @@
 #include <string>
 #include <fstream>
 
+#include "lexeme.hpp"
 #include "lexical_analyzer.hpp"
 #include "logging.hpp"
 #include "syntax_analyzer.hpp"
@@ -16,7 +17,7 @@ void PrintHelp() {
 }
 
 int32_t main(const int argc, const char *argv[]) {
-  // Maybe it's better to create ParceArgs function
+  // Maybe it's better to create ParseArgs function
   // Or to do it in another file
   // I don't wanna to think too much
   if (argc < 2) {
@@ -42,7 +43,16 @@ int32_t main(const int argc, const char *argv[]) {
   std::vector<Lexeme> lexemes;
   try {
     lexemes = PerformLexicalAnalysis(code);
+    for (Lexeme lexeme : lexemes)
+      if (lexeme.GetType() == LexemeType::kUnknown)
+        throw UnknownLexeme(lexeme.GetIndex(), lexeme.GetValue());
     PerformSyntaxAnalysis(lexemes);
+  }
+  catch (const TypeMismatch & e) {
+    log::error(code, e);
+    std::wcout << L"Expected type " << e.GetTypeExpected()->ToString() << ", got " << e.GetTypeGot()->ToString() << "." << std::endl << std::endl;
+    std::wcout << "Terminated, " << format::bright << color::red << '1' << format::reset << " error was found" << std::endl;
+    return 69;
   }
   catch (const TranslatorError & e) {
     log::error(code, e);

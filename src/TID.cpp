@@ -1,6 +1,7 @@
 #include "TID.hpp"
 
 #include "exceptions.hpp"
+#include "operators.hpp"
 #include <memory>
 
 uint32_t GetSizeOfPrimitive(const PrimitiveVariableType & type) {
@@ -26,24 +27,36 @@ uint32_t GetSizeOfPrimitive(const PrimitiveVariableType & type) {
   }
 }
 
-PrimitiveVariableType FromWstringToPrimitiveType(const std::wstring & str) {
+std::wstring names[kPrimitiveVariableTypeCount];
+std::map<std::wstring, PrimitiveVariableType> dict;
+void SetUpNames() {
   static bool set_up = false;
-  static std::map<std::wstring, PrimitiveVariableType> dict;
-  if (!set_up) {
-    dict[L"int8"] = PrimitiveVariableType::kInt8;
-    dict[L"int16"] = PrimitiveVariableType::kInt16;
-    dict[L"int32"] = PrimitiveVariableType::kInt32;
-    dict[L"int64"] = PrimitiveVariableType::kInt64;
-    dict[L"uint8"] = PrimitiveVariableType::kUint8;
-    dict[L"uint16"] = PrimitiveVariableType::kUint16;
-    dict[L"uint32"] = PrimitiveVariableType::kUint32;
-    dict[L"uint64"] = PrimitiveVariableType::kUint64;
-    dict[L"char"] = PrimitiveVariableType::kChar;
-    dict[L"bool"] = PrimitiveVariableType::kBool;
-    dict[L"f32"] = PrimitiveVariableType::kF32;
-    dict[L"f64"] = PrimitiveVariableType::kF32;
-    set_up = true;
-  }
+  if (set_up) return;
+#define Set(key, value) names[static_cast<uint8_t>(PrimitiveVariableType::key)] = value; \
+  dict[value] = PrimitiveVariableType::key
+  Set(kInt8, L"int8");
+  Set(kInt16, L"int16");
+  Set(kInt32, L"int32");
+  Set(kInt64, L"int64");
+  Set(kUint8, L"uint8");
+  Set(kUint16, L"uint16");
+  Set(kUint32, L"uint32");
+  Set(kUint64, L"uint64");
+  Set(kChar, L"char");
+  Set(kBool, L"bool");
+  Set(kF32, L"f32");
+  Set(kF64, L"f64");
+#undef Set
+  set_up = true;
+}
+
+std::wstring ToString(PrimitiveVariableType type) {
+  SetUpNames();
+  return names[static_cast<uint8_t>(type)];
+}
+
+PrimitiveVariableType FromWstringToPrimitiveType(const std::wstring & str) {
+  SetUpNames();
   if (dict.count(str)) return dict[str];
   else return PrimitiveVariableType::kUnknown;
 }
@@ -53,6 +66,44 @@ std::shared_ptr<TIDVariableType> TIDComplexVariableType::GetField(std::wstring &
     if (field_name == name)
       return value;
   return { };
+}
+
+std::wstring TIDPrimitiveVariableType::ToString() const {
+  return ::ToString(type_);
+}
+
+std::wstring TIDComplexVariableType::ToString() const {
+  return name_;
+}
+
+std::wstring TIDFunctionVariableType::ToString() const {
+  std::wstring result = L"function<" + (return_type_ ? return_type_->ToString() : L"void") + L"(";
+  bool was_first = false;
+  if (!parameters_.empty()) {
+    result += parameters_[0]->ToString();
+    was_first = true;
+    for (size_t i = 1; i < parameters_.size(); ++i)
+      result += L", " + parameters_[i]->ToString();
+  }
+  if (!default_parameters_.empty()) {
+    if (!was_first)
+      result += default_parameters_[0]->ToString() + L"=";
+    for (size_t i = !was_first; i < default_parameters_.size(); ++i)
+      result += L", " + default_parameters_[i]->ToString() + L"=";
+  }
+  result += L")>";
+  return result;
+}
+
+std::wstring TIDPointerVariableType::ToString() const {
+  if (value_->GetType() == VariableType::kArray)
+    return L"*(" + value_->ToString() + L")";
+  else
+    return L"*" + value_->ToString();
+}
+
+std::wstring TIDArrayVariableType::ToString() const {
+  return value_->ToString() + L"[]";
 }
 
 std::map<std::shared_ptr<TIDVariableType>, std::shared_ptr<TIDVariableType>> origin;

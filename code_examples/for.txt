@@ -1,8 +1,5 @@
-struct hello {
-    f32 float = 0.5;
-}
-hello h;
+void x(int32 arg);
 
-for (int32 x = 0; x < 10; ++x) {
-    h.float *= x;
+void x(int32 arg) {
+    arg++;
 }

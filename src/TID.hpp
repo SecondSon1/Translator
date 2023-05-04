@@ -22,6 +22,8 @@ class TIDVariableType {
   void SetConst(bool val) { const_ = val; }
   void SetReference(bool val) { ref_ = val; }
 
+  virtual std::wstring ToString() const = 0;
+
  protected:
   TIDVariableType(VariableType type, uint32_t size)
       : variable_type_(type), size_(size), const_(false), ref_(false) {}
@@ -35,7 +37,7 @@ class TIDVariableType {
 
 // if you change this list you need to change another few
 // parameters in operators.cpp in casting section
-constexpr uint8_t kPrimitiveVariableTypeCount = 12;
+constexpr uint8_t kPrimitiveVariableTypeCount = 13;
 enum class PrimitiveVariableType : uint8_t {
   kInt8 = 0, kInt16 = 1, kInt32 = 2, kInt64 = 3,
   kUint8 = 4, kUint16 = 5, kUint32 = 6, kUint64 = 7,
@@ -49,7 +51,7 @@ constexpr PrimitiveVariableType types[] = {
 };
 
 uint32_t GetSizeOfPrimitive(const PrimitiveVariableType & type);
-
+std::wstring ToString(PrimitiveVariableType type);
 PrimitiveVariableType FromWstringToPrimitiveType(const std::wstring & str);
 
 class TIDPrimitiveVariableType : public TIDVariableType {
@@ -62,6 +64,8 @@ class TIDPrimitiveVariableType : public TIDVariableType {
 
   PrimitiveVariableType GetPrimitiveType() const { return type_; }
 
+  std::wstring ToString() const override;
+
  private:
   friend std::shared_ptr<TIDVariableType> GetPrimitiveVariableType(PrimitiveVariableType);
 
@@ -71,10 +75,10 @@ class TIDPrimitiveVariableType : public TIDVariableType {
 
 class TIDComplexVariableType : public TIDVariableType {
  public:
-  TIDComplexVariableType(const std::vector<std::pair<std::wstring, std::shared_ptr<TIDVariableType>>> & contents)
-    : TIDVariableType(VariableType::kComplex, 0), contents_(contents) {
+  TIDComplexVariableType(const std::wstring & name, const std::vector<std::pair<std::wstring, std::shared_ptr<TIDVariableType>>> & contents)
+    : TIDVariableType(VariableType::kComplex, 0), name_(name), contents_(contents) {
     uint32_t our_size = 0;
-    for (const auto & [name, type] : contents_)
+    for (const auto & [field_name, type] : contents_)
       our_size += type->GetSize();
     SetSize(our_size);
   }
@@ -83,7 +87,10 @@ class TIDComplexVariableType : public TIDVariableType {
 
   std::shared_ptr<TIDVariableType> GetField(std::wstring & name) const;
 
+  std::wstring ToString() const override;
+
  private:
+  std::wstring name_;
   std::vector<std::pair<std::wstring, std::shared_ptr<TIDVariableType>>> contents_;
 };
 
@@ -99,6 +106,8 @@ class TIDFunctionVariableType : public TIDVariableType {
   const std::vector<std::shared_ptr<TIDVariableType>> & GetParameters() const { return parameters_; }
   const std::vector<std::shared_ptr<TIDVariableType>> & GetDefaultParameters() const { return default_parameters_; }
 
+  std::wstring ToString() const override;
+
  private:
   std::shared_ptr<TIDVariableType> return_type_;
   std::vector<std::shared_ptr<TIDVariableType>> parameters_, default_parameters_;
@@ -112,6 +121,8 @@ class TIDPointerVariableType : public TIDVariableType {
   TIDPointerVariableType([[maybe_unused]] Guard _, const std::shared_ptr<TIDVariableType> & pointing_to)
     : TIDVariableType(VariableType::kPointer, 8), value_(pointing_to) {}
   std::shared_ptr<TIDVariableType> GetValue() const { return value_; }
+
+  std::wstring ToString() const override;
 
  private:
   friend std::shared_ptr<TIDVariableType> DerivePointerFromType(const std::shared_ptr<TIDVariableType> & type);
@@ -128,6 +139,8 @@ class TIDArrayVariableType : public TIDVariableType {
   TIDArrayVariableType([[maybe_unused]] Guard _, const std::shared_ptr<TIDVariableType> & value)
     : TIDVariableType(VariableType::kArray, 8), value_(value) {}
   std::shared_ptr<TIDVariableType> GetValue() const { return value_; }
+
+  std::wstring ToString() const override;
 
  private:
   friend std::shared_ptr<TIDVariableType> DeriveArrayFromType(const std::shared_ptr<TIDVariableType> & type);

@@ -43,6 +43,15 @@ class StringNotEndedError : public LexicalAnalysisError {
   }
 };
 
+class CommentNotEndedError : public LexicalAnalysisError {
+ public:
+  CommentNotEndedError(size_t index) : LexicalAnalysisError(index) {}
+
+  const char* what() const noexcept override {
+    return "Multiline comment not ended";
+  }
+};
+
 // TODO: maybe move to other stage
 class UnknownEscapeSequenceError : public LexicalAnalysisError {
  public:
@@ -60,6 +69,19 @@ class NumberNotFinishedError : public LexicalAnalysisError {
   const char* what() const noexcept override {
     return "Number started but not finished";
   }
+};
+
+class UnknownLexeme : public LexicalAnalysisError {
+ public:
+  UnknownLexeme(size_t index, const std::wstring & value) : LexicalAnalysisError(index), value_(value) {}
+
+  std::wstring GetValue() const { return value_; }
+
+  const char* what() const noexcept override {
+    return "Number started but not finished";
+  }
+ private:
+  std::wstring value_;
 };
 
 // ==============================
@@ -215,7 +237,6 @@ class TypeMismatch : public SemanticsAnalysisError {
  private:
   std::shared_ptr<TIDVariableType> expected_, got_;
 };
-
 
 class LoopInstructionsOutsideOfLoop : public SemanticsAnalysisError {
  public:
