@@ -119,11 +119,20 @@ class UnexpectedLexeme : public SyntaxAnalysisError {
 };
 
 class ExpectedExpression : public SyntaxAnalysisError {
- public:
+  public:
   ExpectedExpression(const Lexeme & lexeme) : SyntaxAnalysisError(lexeme) {}
 
   const char* what() const noexcept override {
     return "Expression expected";
+  }
+};
+
+class ExpectedDefaultParameter : public SyntaxAnalysisError {
+  public:
+  ExpectedDefaultParameter(const Lexeme & lexeme) : SyntaxAnalysisError(lexeme) {}
+
+  const char* what() const noexcept override {
+    return "Expected default parameter";
   }
 };
 

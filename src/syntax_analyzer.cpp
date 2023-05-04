@@ -392,7 +392,9 @@ std::pair<std::vector<std::pair<std::wstring, std::shared_ptr<TIDVariableType>>>
       started_default = true;
     if (started_default) {
       default_params.push_back(var);
-      Expect(LexemeType::kOperator, L"=");
+      if (!IsLexeme(LexemeType::kOperator, L"=")) {
+        throw ExpectedDefaultParameter(lexeme);
+      }
       GetNext();
       auto param_type = Expression();
       ExpectToBeAbleToCastTo(param_type, var.second);
