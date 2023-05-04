@@ -6,25 +6,43 @@
 #include "lexeme.hpp"
 #include "terminal_formatting.hpp"
 
-void printUnexpectedLexeme(const TranslatorError &error) {
-  const UnexpectedLexeme *unexpectedLexeme = dynamic_cast<const UnexpectedLexeme *>(&error);
-  if (unexpectedLexeme == nullptr) return;
+void printUnexpectedLexeme(const TranslatorError &err) {
+  const UnexpectedLexeme *error = dynamic_cast<const UnexpectedLexeme *>(&err);
+  if (error == nullptr) return;
 
-  std::wcout << format::bright << " (";
-  std::wcout << "expected: " << color::blue << ToString(unexpectedLexeme->GetExpected()) << format::reset;
-  std::wcout << format::bright << ", got: " << color::red << ToString(unexpectedLexeme->GetActual().GetType())
-             << format::reset;
+  std::wcout << format::bright << " (" << format::reset;
+  std::wcout << format::bright << "expected: " << color::blue << ToString(error->GetExpected()) << format::reset;
+  std::wcout << format::bright << ", got: " << color::red << ToString(error->GetActual().GetType()) << format::reset;
   std::wcout << format::bright << ')' << format::reset;
 }
 
-void printTypeMismatch(const TranslatorError &error) {
-  const TypeMismatch *typeMismatch = dynamic_cast<const TypeMismatch *>(&error);
-  if (typeMismatch == nullptr) return;
+void printUnknownOperator(const TranslatorError &err) {
+  const UnknownOperator *error = dynamic_cast<const UnknownOperator *>(&err);
+  if (error == nullptr) return;
 
-  std::wcout << format::bright << " (";
-  std::wcout << "expected: " << color::blue << typeMismatch->GetTypeExpected()->ToString() << format::reset;
-  std::wcout << format::bright << ", got: " << color::red << typeMismatch->GetTypeGot()->ToString()
-             << format::reset;
+  std::wcout << format::bright << " (" << format::reset;
+  std::wcout << format::bright << color::blue << "TYPE_1" << format::reset;
+  std::wcout << format::bright << " " << color::red << error->GetOperator().ToString() << " " << format::reset;
+  std::wcout << format::bright << color::blue << "TYPE_2" << format::reset;
+  std::wcout << format::bright << ')' << format::reset;
+}
+
+void printTypeMismatch(const TranslatorError &err) {
+  const TypeMismatch *error = dynamic_cast<const TypeMismatch *>(&err);
+  if (error == nullptr) return;
+
+  std::wcout << format::bright << " (" << format::reset;
+  std::wcout << format::bright << "expected: " << color::blue << error->GetTypeExpected()->ToString() << format::reset;
+  std::wcout << format::bright << ", got: " << color::red << error->GetTypeGot()->ToString() << format::reset;
+  std::wcout << format::bright << ')' << format::reset;
+}
+
+void printFunctionParameterListDoesNotMatch(const TranslatorError &err) {
+  const FunctionParameterListDoesNotMatch *error = dynamic_cast<const FunctionParameterListDoesNotMatch *>(&err);
+  if (error == nullptr) return;
+
+  std::wcout << format::bright << " (" << format::reset;
+  std::wcout << format::bright << error->GetFunctionType()->ToString() << format::reset;
   std::wcout << format::bright << ')' << format::reset;
 }
 
@@ -43,7 +61,9 @@ void log::error(const std::wstring &code, const TranslatorError &error) {
   std::wcout << format::bright << lineIndex << ':' << columnIndex << ": ";
   std::wcout << color::red << "error: " << format::reset << format::bright << error.what() << format::reset;
   printUnexpectedLexeme(error);
+  printUnknownOperator(error);
   printTypeMismatch(error);
+  printFunctionParameterListDoesNotMatch(error);
   std::wcout << std::endl;
 
   // Getting error lexeme type

@@ -8,7 +8,7 @@
 #include "lexeme.hpp"
 
 enum class VariableType : uint8_t {
-  kPrimitive, kComplex, kFunction, kPointer, kArray
+  kPrimitive, kComplex, kFunction, kPointer, kArray, kNull
 };
 
 class TIDVariableType {
@@ -132,21 +132,26 @@ class TIDPointerVariableType : public TIDVariableType {
 };
 
 class TIDArrayVariableType : public TIDVariableType {
- private:
+  private:
   struct Guard { explicit Guard(int) {} };
 
- public:
+  public:
   TIDArrayVariableType([[maybe_unused]] Guard _, const std::shared_ptr<TIDVariableType> & value)
-    : TIDVariableType(VariableType::kArray, 8), value_(value) {}
+      : TIDVariableType(VariableType::kArray, 8), value_(value) {}
   std::shared_ptr<TIDVariableType> GetValue() const { return value_; }
 
   std::wstring ToString() const override;
 
- private:
+  private:
   friend std::shared_ptr<TIDVariableType> DeriveArrayFromType(const std::shared_ptr<TIDVariableType> & type);
 
- private:
+  private:
   std::shared_ptr<TIDVariableType> value_;
+};
+
+class TIDNullVariableType : public TIDVariableType {
+  public:
+  TIDNullVariableType() : TIDVariableType(VariableType::kNull, 0) {}
 };
 
 std::shared_ptr<TIDVariableType> GetPrimitiveVariableType(PrimitiveVariableType type);

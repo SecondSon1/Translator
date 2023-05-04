@@ -170,11 +170,16 @@ class UnknownOperator : public SemanticsAnalysisError {
 
   Operator GetOperator() const { return op_; }
 
+  std::shared_ptr<TIDVariableType> GetFirstType() const { return first_; }
+
+  std::shared_ptr<TIDVariableType> GetSecondType() const { return second_; }
+
   const char* what() const noexcept override {
     return "Operator does not operate on provided type(s)";
   }
  private:
   Operator op_;
+  std::shared_ptr<TIDVariableType> first_, second_;
 };
 
 class TypeNotIterable : public SemanticsAnalysisError {
