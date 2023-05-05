@@ -39,25 +39,27 @@ int32_t main(const int argc, const char *argv[]) {
     code.push_back(L'\n');
   }
   codeFile.close();
+  log::init(code);
 
-  std::vector<Lexeme> lexemes;
   try {
-    lexemes = PerformLexicalAnalysis(code);
+    std::vector<Lexeme> lexemes = PerformLexicalAnalysis(code);
     for (Lexeme lexeme : lexemes)
       if (lexeme.GetType() == LexemeType::kUnknown)
         throw UnknownLexeme(lexeme.GetIndex(), lexeme.GetValue());
     PerformSyntaxAnalysis(lexemes);
   }
   catch (const TranslatorError & e) {
-    log::error(code, e);
-    std::wcout << "Terminated, " << format::bright << color::red << '1' << format::reset << " error was found" << std::endl;
+    log::error(e);
+    std::wcout << "Terminated, " << format::bright << color::red << '1' << format::reset << " error(s) were found" << std::endl;
+    std::wcout << format::bright << color::blue << log::getWarningsNum() << format::reset << " warning(s) were generated" << std::endl;
     return 2;
   }
   catch (...) {
     std::wcout << "Something went wrong. We are sorry about it";
     return 3;
   }
-  std::wcout << color::green << format::bright << '0' << format::reset << " errors were found, compiling..." << std::endl;
+  std::wcout << format::bright << color::green << '0' << format::reset << " error(s) were found" << std::endl;
+  std::wcout << format::bright << color::blue << log::getWarningsNum() << format::reset << " warning(s) were generated" << std::endl;
 
   return 0;
 }

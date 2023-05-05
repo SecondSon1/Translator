@@ -1,11 +1,14 @@
 #pragma once
 
 #include "exceptions.hpp"
+#include "warnings.hpp"
 
 namespace log {
-  void error(const std::wstring &code, const TranslatorError &error);
+  void init(const std::wstring &code);
 
-  void warning(const std::wstring &code, const std::vector<Lexeme> &lexemes, uint64_t ind);
+  void error(const TranslatorError &error);
+
+  void warning(const TranslatorWarning &warning);
 
   int64_t getWarningsNum();
 }

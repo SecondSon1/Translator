@@ -8,6 +8,8 @@
 #include <vector>
 #include "casts.hpp"
 #include "operations.hpp"
+#include "warnings.hpp"
+#include "logging.hpp"
 
 #define DEBUG_ACTIVE 0
 
@@ -280,6 +282,8 @@ std::pair<std::wstring, std::shared_ptr<TIDVariableType>> VariableIdentifier(std
       auto ind_type = Expression();
       ExpectToBeAbleToCastTo(ind_type,
         SetConstToType(GetPrimitiveVariableType(PrimitiveVariableType::kUint32), true));
+      if (!CanCastLossless(ind_type, SetConstToType(GetPrimitiveVariableType(PrimitiveVariableType::kUint32), true)))
+        log::warning(Downcast(lexeme, ind_type, SetConstToType(GetPrimitiveVariableType(PrimitiveVariableType::kUint32), true)));
     }
     Expect(LexemeType::kBracket, L"]");
     GetNext();
@@ -311,6 +315,8 @@ std::vector<std::pair<std::wstring, std::shared_ptr<TIDVariableType>>> Definitio
         auto ind_type = Expression();
         ExpectToBeAbleToCastTo(ind_type,
           SetConstToType(GetPrimitiveVariableType(PrimitiveVariableType::kUint32), true));
+        if (!CanCastLossless(ind_type, SetConstToType(GetPrimitiveVariableType(PrimitiveVariableType::kUint32), true)))
+          log::warning(Downcast(lexeme, ind_type, SetConstToType(GetPrimitiveVariableType(PrimitiveVariableType::kUint32), true)));
       }
       Expect(LexemeType::kBracket, L"]");
       GetNext();
@@ -325,6 +331,8 @@ std::vector<std::pair<std::wstring, std::shared_ptr<TIDVariableType>>> Definitio
     GetNext();
     auto expr_type = Expression();
     ExpectToBeAbleToCastTo(expr_type, var_type);
+    if (!CanCastLossless(expr_type, var_type))
+      log::warning(Downcast(lexeme, expr_type, var_type));
   }
   while (IsLexeme(LexemeType::kPunctuation, L",")) {
     GetNext();
@@ -334,6 +342,8 @@ std::vector<std::pair<std::wstring, std::shared_ptr<TIDVariableType>>> Definitio
       GetNext();
       auto expr_type = Expression();
       ExpectToBeAbleToCastTo(expr_type, var_type);
+      if (!CanCastLossless(expr_type, var_type))
+        log::warning(Downcast(lexeme, expr_type, var_type));
     }
   }
   Expect(LexemeType::kPunctuation, L";");
@@ -398,6 +408,8 @@ std::pair<std::vector<std::pair<std::wstring, std::shared_ptr<TIDVariableType>>>
       GetNext();
       auto param_type = Expression();
       ExpectToBeAbleToCastTo(param_type, var.second);
+      if (!CanCastLossless(param_type, var.second))
+        log::warning(Downcast(lexeme, param_type, var.second));
     } else {
       params.push_back(var);
     }
@@ -508,6 +520,8 @@ void If() {
   Expect(LexemeType::kParenthesis, L")");
   GetNext();
   ExpectToBeAbleToCastTo(type, GetPrimitiveVariableType(PrimitiveVariableType::kBool));
+  if (!CanCastLossless(type, GetPrimitiveVariableType(PrimitiveVariableType::kBool)))
+    log::warning(Downcast(lexeme, type, GetPrimitiveVariableType(PrimitiveVariableType::kBool)));
   Block(true);
   Elif();
   if (IsLexeme(LexemeType::kReserved, L"else"))
@@ -521,6 +535,8 @@ void Elif() {
     GetNext();
     std::shared_ptr<TIDVariableType> type = Expression();
     ExpectToBeAbleToCastTo(type, GetPrimitiveVariableType(PrimitiveVariableType::kBool));
+    if (!CanCastLossless(type, GetPrimitiveVariableType(PrimitiveVariableType::kBool)))
+      log::warning(Downcast(lexeme, type, GetPrimitiveVariableType(PrimitiveVariableType::kBool)));
     Expect(LexemeType::kParenthesis, L")");
     GetNext();
     Block(true);
@@ -547,6 +563,8 @@ void For() {
   std::shared_ptr<TIDVariableType> type = EpsExpression();
   if (type)
     ExpectToBeAbleToCastTo(type, GetPrimitiveVariableType(PrimitiveVariableType::kBool));
+  if (!CanCastLossless(type, GetPrimitiveVariableType(PrimitiveVariableType::kBool)))
+    log::warning(Downcast(lexeme, type, GetPrimitiveVariableType(PrimitiveVariableType::kBool)));
   Expect(LexemeType::kPunctuation, L";");
   GetNext();
   if (!IsLexeme(LexemeType::kParenthesis, L")"))
@@ -591,6 +609,8 @@ void While() {
   GetNext();
   auto type = Expression();
   ExpectToBeAbleToCastTo(type, GetPrimitiveVariableType(PrimitiveVariableType::kBool));
+  if (!CanCastLossless(type, GetPrimitiveVariableType(PrimitiveVariableType::kBool)))
+    log::warning(Downcast(lexeme, type, GetPrimitiveVariableType(PrimitiveVariableType::kBool)));
   Expect(LexemeType::kParenthesis, L")");
   GetNext();
   ++surrounding_loop_count;
@@ -608,6 +628,8 @@ void DoWhile() {
   GetNext();
   auto type = Expression();
   ExpectToBeAbleToCastTo(type, GetPrimitiveVariableType(PrimitiveVariableType::kBool));
+  if (!CanCastLossless(type, GetPrimitiveVariableType(PrimitiveVariableType::kBool)))
+    log::warning(Downcast(lexeme, type, GetPrimitiveVariableType(PrimitiveVariableType::kBool)));
   Expect(LexemeType::kParenthesis, L")");
   GetNext();
   Expect(LexemeType::kPunctuation, L";");
@@ -667,6 +689,8 @@ void Return() {
   auto type = EpsExpression();
   Expect(LexemeType::kPunctuation, L";");
   ExpectToBeAbleToCastTo(type, scope_return_type.back());
+  if (!CanCastLossless(type, scope_return_type.back()))
+    log::warning(Downcast(lexeme, type, scope_return_type.back()));
   GetNext();
 }
 
@@ -916,6 +940,8 @@ std::shared_ptr<TIDVariableType> Priority13() {
       if (!IsLexeme(LexemeType::kBracket, L"]")) {
         auto index_type = Expression();
         ExpectToBeAbleToCastTo(index_type, GetPrimitiveVariableType(PrimitiveVariableType::kUint32));
+        if (!CanCastLossless(index_type, GetPrimitiveVariableType(PrimitiveVariableType::kUint32)))
+          log::warning(Downcast(lexeme, index_type, GetPrimitiveVariableType(PrimitiveVariableType::kUint32)));
       }
       Expect(LexemeType::kBracket, L"]");
       GetNext();
@@ -944,6 +970,7 @@ std::shared_ptr<TIDVariableType> Priority13() {
     } else if (IsLexeme(LexemeType::kReserved, L"as")) {
       GetNext();
       std::shared_ptr<TIDVariableType> new_type = Type(true);
+      ExpectToBeAbleToCastTo(type, new_type);
       ExpectToBeAbleToCastTo(type, new_type);
       type = new_type;
     } else

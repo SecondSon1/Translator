@@ -3,8 +3,14 @@
 #include <iostream>
 
 #include "exceptions.hpp"
+#include "warnings.hpp"
 #include "lexeme.hpp"
 #include "terminal_formatting.hpp"
+
+int64_t warningsNum = 0;
+std::wstring code;
+
+void log::init(const std::wstring &cd) { code = cd; }
 
 void printUnexpectedLexeme(const TranslatorError &err) {
   const UnexpectedLexeme *error = dynamic_cast<const UnexpectedLexeme *>(&err);
@@ -79,7 +85,7 @@ void printFunctionParameterListDoesNotMatch(const TranslatorError &err) {
   std::wcout << format::bright << ')' << format::reset;
 }
 
-void log::error(const std::wstring &code, const TranslatorError &error) {
+void log::error(const TranslatorError &error) {
   // Getting position in file
   size_t lineIndex = 1, columnIndex = 0, lineStartIndex = 0;
   for (size_t i = 0; i < error.GetIndex(); ++i, ++columnIndex) {
@@ -118,13 +124,20 @@ void log::error(const std::wstring &code, const TranslatorError &error) {
   std::wcout << std::endl << std::endl;
 }
 
-void log::warning(const std::wstring &code, const std::vector<Lexeme> &lexemes, uint64_t ind) {
-  // For testing
-  size_t index = lexemes[ind].GetIndex();
+void printDowncast(const TranslatorWarning &warn) {
+  const Downcast *warning = dynamic_cast<const Downcast *>(&warn);
+  if (warning == nullptr) return;
 
-  // Getting lexeme position in file
+  std::wcout << format::bright << " (" << format::reset;
+  std::wcout << format::bright << "from: " << color::blue << warning->GetFrom()->ToString() << format::reset;
+  std::wcout << format::bright << ", to: " << color::red << warning->GetTo()->ToString() << format::reset;
+  std::wcout << format::bright << ')' << format::reset;
+}
+
+void log::warning(const TranslatorWarning &warning) {
+  // Getting position in file
   size_t lineIndex = 1, columnIndex = 0, lineStartIndex = 0;
-  for (size_t i = 0; i < index; ++i, ++columnIndex) {
+  for (size_t i = 0; i < warning.GetIndex(); ++i, ++columnIndex) {
     if (code[i] == '\n') {
       columnIndex = 0;
       ++lineIndex;
@@ -134,16 +147,28 @@ void log::warning(const std::wstring &code, const std::vector<Lexeme> &lexemes, 
 
   // Printing warning info
   std::wcout << format::bright << lineIndex << ':' << columnIndex << ": ";
-  std::wcout << color::blue << "warning: " << format::reset;
-  std::wcout << format::bright << "converting " << color::green << "string" << format::reset;
-  std::wcout << format::bright << " to " << color::red << "bool" << format::reset;
+  std::wcout << color::blue << "warning: " << format::reset << format::bright << warning.what() << format::reset;
+  printDowncast(warning);
   std::wcout << std::endl;
 
-  // Printing line with error
+  // Getting warning lexeme type
+  size_t lexemeSize = 1;
+  const SyntaxAnalysisWarning *syntaxWarning = dynamic_cast<const SyntaxAnalysisWarning *>(&warning);
+  const SemanticsAnalysisWarning *semanticsWarning = dynamic_cast<const SemanticsAnalysisWarning *>(&warning);
+  if (syntaxWarning != nullptr) {
+    lexemeSize = semanticsWarning->GetActual().GetValue().size();
+  } else if (semanticsWarning != nullptr) {
+    lexemeSize = semanticsWarning->GetActual().GetValue().size();
+  }
+
+  // Printing line with warning
   for (size_t i = lineStartIndex; i < code.size() && code[i] != '\n'; ++i) {
-    if (i == index) std::wcout << color::background::blue << color::white;
+    if (i == warning.GetIndex()) std::wcout << color::background::blue << color::white;
     std::wcout << code[i];
-    if (i == index + lexemes[ind].GetValue().size() - 1) std::wcout << format::reset;
+    if (i == warning.GetIndex() + lexemeSize - 1) std::wcout << format::reset;
   }
   std::wcout << std::endl << std::endl;
+  ++warningsNum;
 }
+
+int64_t log::getWarningsNum() { return warningsNum; }
