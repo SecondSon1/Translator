@@ -13,7 +13,7 @@
 std::map<std::string, std::string> options = {
     {"disableWarnings", "false"},
     {"compileFile",     ""},
-    {"outFile",         ""},
+    {"outFile",         "out.bbl"},
     {"runFile",         ""},
 };
 
@@ -41,9 +41,25 @@ void ParseArgs(const int argc, const char *argv[]) {
 }
 
 void PrintHelp() {
-	// TODO
-	std::wcout << "Example help" << std::endl;
-	return;
+	std::wcout << "Usage: bblc [-c | --compile <path>] [-o | --out <path>] [-r | --run <path>] [--disableWarnings]" << std::endl << std::endl;
+  std::wcout << format::bright << "-c | --compile <path>" << format::reset << "   Compiling file given in <path>" << std::endl;
+  std::wcout << format::bright << "-o | --out <path>" << format::reset << "       Writes compiled file in <path>" << std::endl;
+  std::wcout << format::bright << "-r | --run <path>" << format::reset << "       Running file given in <path>" << std::endl;
+  std::wcout << format::bright << "--disableWarnings" << format::reset << "       Disables all the warning during compilation" << std::endl;
+  std::wcout << std::endl;
+}
+
+std::vector<std::string> split(std::string str, const std::string & delimiter) {
+  std::vector<std::string> result;
+  size_t pos = 0;
+  std::string token;
+
+  while ((pos = str.find(delimiter)) != std::string::npos) {
+    token = str.substr(0, pos);
+    result.push_back(token);
+    str.erase(0, pos + delimiter.length());
+  }
+  return result;
 }
 
 int32_t main(const int argc, const char *argv[]) {
