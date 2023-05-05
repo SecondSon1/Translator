@@ -10,25 +10,70 @@
 #include "exceptions.hpp"
 #include "terminal_formatting.hpp"
 
+std::map<std::string, std::string> options = {
+    {"disableWarnings", "false"},
+    {"compileFile",     ""},
+    {"outFile",         "out.bbl"},
+    {"runFile",         ""},
+};
+
+void ParseArgs(const int argc, const char *argv[]) {
+  for (int i = 1; i < argc; ++i) {
+    if (strcmp(argv[i], "-c") == 0 || strcmp(argv[i], "--compile") == 0) {
+      if (i + 1 < argc) {
+        options["compileFile"] = argv[++i];
+      }
+    }
+    else if (strcmp(argv[i], "-o") == 0 || strcmp(argv[i], "--out") == 0) {
+      if (i + 1 < argc) {
+        options["outFile"] = argv[++i];
+      }
+    }
+    else if (strcmp(argv[i], "-r") == 0 || strcmp(argv[i], "--run") == 0) {
+      if (i + 1 < argc) {
+        options["runFile"] = argv[++i];
+      }
+    }
+    else if (strcmp(argv[i], "--disableWarnings") == 0) {
+      options["disableWarnings"] = "true";
+    }
+  }
+}
+
 void PrintHelp() {
-	// TODO
-	std::wcout << "Example help" << std::endl;
-	return;
+	std::wcout << "Usage: bblc [-c | --compile <path>] [-o | --out <path>] [-r | --run <path>] [--disableWarnings]" << std::endl << std::endl;
+  std::wcout << format::bright << "-c | --compile <path>" << format::reset << "   Compiling file given in <path>" << std::endl;
+  std::wcout << format::bright << "-o | --out <path>" << format::reset << "       Writes compiled file in <path>" << std::endl;
+  std::wcout << format::bright << "-r | --run <path>" << format::reset << "       Running file given in <path>" << std::endl;
+  std::wcout << format::bright << "--disableWarnings" << format::reset << "       Disables all the warning during compilation" << std::endl;
+  std::wcout << std::endl;
+}
+
+std::vector<std::string> split(std::string str, const std::string & delimiter) {
+  std::vector<std::string> result;
+  size_t pos = 0;
+  std::string token;
+
+  while ((pos = str.find(delimiter)) != std::string::npos) {
+    token = str.substr(0, pos);
+    result.push_back(token);
+    str.erase(0, pos + delimiter.length());
+  }
+  return result;
 }
 
 int32_t main(const int argc, const char *argv[]) {
-  // Maybe it's better to create ParseArgs function
-  // Or to do it in another file
-  // I don't wanna to think too much
   if (argc < 2) {
     PrintHelp();
     return 0;
   }
+  ParseArgs(argc, argv);
 
   std::wifstream codeFile;
-  codeFile.open(argv[1]);
+  codeFile.open(options["compileFile"]);
   if (!codeFile.is_open()) {
-    std::wcout << format::bright << color::red << "Cannot open file " << format::reset << argv[1] << std::endl;
+    std::wcout << format::bright << color::red << "Cannot open file " << format::reset;
+    std::cout << options["compileFile"] << std::endl;
     return 1;
   }
 
@@ -39,31 +84,27 @@ int32_t main(const int argc, const char *argv[]) {
     code.push_back(L'\n');
   }
   codeFile.close();
+  log::init(code, options);
 
-  std::vector<Lexeme> lexemes;
   try {
-    lexemes = PerformLexicalAnalysis(code);
+    std::vector<Lexeme> lexemes = PerformLexicalAnalysis(code);
     for (Lexeme lexeme : lexemes)
       if (lexeme.GetType() == LexemeType::kUnknown)
         throw UnknownLexeme(lexeme.GetIndex(), lexeme.GetValue());
     PerformSyntaxAnalysis(lexemes);
   }
-  catch (const TypeMismatch & e) {
-    log::error(code, e);
-    std::wcout << L"Expected type " << e.GetTypeExpected()->ToString() << ", got " << e.GetTypeGot()->ToString() << "." << std::endl << std::endl;
-    std::wcout << "Terminated, " << format::bright << color::red << '1' << format::reset << " error was found" << std::endl;
-    return 69;
-  }
   catch (const TranslatorError & e) {
-    log::error(code, e);
-    std::wcout << "Terminated, " << format::bright << color::red << '1' << format::reset << " error was found" << std::endl;
+    log::error(e);
+    std::wcout << "Terminated, " << format::bright << color::red << '1' << format::reset << " error(s) were found" << std::endl;
+    std::wcout << format::bright << color::blue << log::getWarningsNum() << format::reset << " warning(s) were generated" << std::endl;
     return 2;
   }
   catch (...) {
     std::wcout << "Something went wrong. We are sorry about it";
     return 3;
   }
-  std::wcout << color::green << format::bright << '0' << format::reset << " errors were found, compiling..." << std::endl;
+  std::wcout << format::bright << color::green << '0' << format::reset << " error(s) were found" << std::endl;
+  std::wcout << format::bright << color::blue << log::getWarningsNum() << format::reset << " warning(s) were generated" << std::endl;
 
   return 0;
 }

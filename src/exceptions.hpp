@@ -119,11 +119,20 @@ class UnexpectedLexeme : public SyntaxAnalysisError {
 };
 
 class ExpectedExpression : public SyntaxAnalysisError {
- public:
+  public:
   ExpectedExpression(const Lexeme & lexeme) : SyntaxAnalysisError(lexeme) {}
 
   const char* what() const noexcept override {
     return "Expression expected";
+  }
+};
+
+class ExpectedDefaultParameter : public SyntaxAnalysisError {
+  public:
+  ExpectedDefaultParameter(const Lexeme & lexeme) : SyntaxAnalysisError(lexeme) {}
+
+  const char* what() const noexcept override {
+    return "Expected default parameter";
   }
 };
 
@@ -170,11 +179,16 @@ class UnknownOperator : public SemanticsAnalysisError {
 
   Operator GetOperator() const { return op_; }
 
+  std::shared_ptr<TIDVariableType> GetFirstType() const { return first_; }
+
+  std::shared_ptr<TIDVariableType> GetSecondType() const { return second_; }
+
   const char* what() const noexcept override {
     return "Operator does not operate on provided type(s)";
   }
  private:
   Operator op_;
+  std::shared_ptr<TIDVariableType> first_, second_;
 };
 
 class TypeNotIterable : public SemanticsAnalysisError {
