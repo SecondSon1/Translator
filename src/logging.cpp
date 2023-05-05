@@ -7,10 +7,15 @@
 #include "lexeme.hpp"
 #include "terminal_formatting.hpp"
 
-int64_t warningsNum = 0;
-std::wstring code;
+std::wstring code_;
+std::map<std::string, std::string> options_;
 
-void log::init(const std::wstring &cd) { code = cd; }
+int64_t warningsNum = 0;
+
+void log::init(const std::wstring &code, const std::map<std::string, std::string> & options) {
+  code_ = code;
+  options_ = options;
+}
 
 void printUnexpectedLexeme(const TranslatorError &err) {
   const UnexpectedLexeme *error = dynamic_cast<const UnexpectedLexeme *>(&err);
@@ -89,7 +94,7 @@ void log::error(const TranslatorError &error) {
   // Getting position in file
   size_t lineIndex = 1, columnIndex = 0, lineStartIndex = 0;
   for (size_t i = 0; i < error.GetIndex(); ++i, ++columnIndex) {
-    if (code[i] == '\n') {
+    if (code_[i] == '\n') {
       columnIndex = 0;
       ++lineIndex;
       lineStartIndex = i + 1;
@@ -116,13 +121,14 @@ void log::error(const TranslatorError &error) {
   }
 
   // Printing line with error
-  for (size_t i = lineStartIndex; i < code.size() && code[i] != '\n'; ++i) {
+  for (size_t i = lineStartIndex; i < code_.size() && code_[i] != '\n'; ++i) {
     if (i == error.GetIndex()) std::wcout << color::background::red << color::white;
-    std::wcout << code[i];
+    std::wcout << code_[i];
     if (i == error.GetIndex() + lexemeSize - 1) std::wcout << format::reset;
   }
   std::wcout << std::endl << std::endl;
 }
+
 
 void printDowncast(const TranslatorWarning &warn) {
   const Downcast *warning = dynamic_cast<const Downcast *>(&warn);
@@ -135,10 +141,12 @@ void printDowncast(const TranslatorWarning &warn) {
 }
 
 void log::warning(const TranslatorWarning &warning) {
+  if (options_["disableWarnings"] == "true") return;
+
   // Getting position in file
   size_t lineIndex = 1, columnIndex = 0, lineStartIndex = 0;
   for (size_t i = 0; i < warning.GetIndex(); ++i, ++columnIndex) {
-    if (code[i] == '\n') {
+    if (code_[i] == '\n') {
       columnIndex = 0;
       ++lineIndex;
       lineStartIndex = i + 1;
@@ -162,9 +170,9 @@ void log::warning(const TranslatorWarning &warning) {
   }
 
   // Printing line with warning
-  for (size_t i = lineStartIndex; i < code.size() && code[i] != '\n'; ++i) {
+  for (size_t i = lineStartIndex; i < code_.size() && code_[i] != '\n'; ++i) {
     if (i == warning.GetIndex()) std::wcout << color::background::blue << color::white;
-    std::wcout << code[i];
+    std::wcout << code_[i];
     if (i == warning.GetIndex() + lexemeSize - 1) std::wcout << format::reset;
   }
   std::wcout << std::endl << std::endl;
