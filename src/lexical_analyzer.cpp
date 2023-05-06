@@ -91,6 +91,7 @@ std::vector<Lexeme> PerformLexicalAnalysis(const std::wstring & code) {
       result.emplace_back(resulting_type, str, i);
     } else if (std::isdigit(code[i])) {                           // numeric literal
       bool is_hex = false;
+      bool is_decimal = false;
       if (Fits(code, i, L"0x")) {
         is_hex = true;
         ++j;
@@ -105,6 +106,20 @@ std::vector<Lexeme> PerformLexicalAnalysis(const std::wstring & code) {
           throw NumberNotFinishedError(j);
         while (j < code.size() && std::isdigit(code[j]))
           str.push_back(code[j++]);
+        is_decimal = true;
+      }
+      if (j < code.size()) {
+        if (is_decimal) {
+          if (code[j] == 'f' || code[j] == 'F')
+            str.push_back(code[j++]);
+        } else {
+          if (code[j] == 'u' || code[j] == 'U')
+            str.push_back(code[j++]);
+          if (j < code.size() &&
+              (code[j] == 'i' || code[j] == 'I' || code[j] == 'l' || code[j] == 'L' || code[j] == 's'
+                || code[j] == 'S' || code[j] == 't' || code[j] == 'T'))
+            str.push_back(code[j++]);
+        }
       }
       result.emplace_back(LexemeType::kNumericLiteral, str, i);
     } else if (code[i] == L'"' || code[i] == L'\'') {

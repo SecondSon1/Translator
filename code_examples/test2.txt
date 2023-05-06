@@ -1,4 +1,4 @@
-int32 a = 5;
+int32 a = 5ul;
 int32 *b = &a;
 
 int64 x = *(b as int32*);

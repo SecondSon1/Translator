@@ -1,148 +1,119 @@
 #include "casts.hpp"
+#include "TID.hpp"
+#include "exceptions.hpp"
 
 #include <queue>
 
 bool set_up_casting = false;
 
-std::vector<PrimitiveVariableType> up_cast[kPrimitiveVariableTypeCount];
 uint8_t layer[kPrimitiveVariableTypeCount];
-// -1 - can't cast
-//  0 - can cast without losses
-//  1 - can cast but with losses
-int8_t can_cast[kPrimitiveVariableTypeCount][kPrimitiveVariableTypeCount];
+
+// bool -> int8 -> uint8 -> int16 -> uint16 -> int32 -> uint32 -> int64 -> uint64 -> f32 -> f64
+//          ^
+//          |
+//         char
 
 void SetUpCastingPrimitives() {
-  for (uint8_t i = 0; i < kPrimitiveVariableTypeCount; ++i)
-    std::fill(can_cast[i], can_cast[i] + kPrimitiveVariableTypeCount, -1);
-
-  std::vector<uint8_t> rg[kPrimitiveVariableTypeCount];
-#define Cast(x, y) up_cast[static_cast<uint8_t>(PrimitiveVariableType::x)].push_back(PrimitiveVariableType::y);\
-  rg[static_cast<uint8_t>(PrimitiveVariableType::y)].push_back(static_cast<uint8_t>(PrimitiveVariableType::x))
-
-  Cast(kBool, kInt8);
-  Cast(kChar, kUint8);
-  Cast(kUint8, kChar);
-
-  Cast(kInt8, kUint8);
-  Cast(kUint8, kInt8);
-  Cast(kInt8, kInt16);
-  Cast(kUint8, kUint16);
-  Cast(kUint8, kInt16);
-
-  Cast(kInt16, kUint16);
-  Cast(kUint16, kInt16);
-  Cast(kInt16, kInt32);
-  Cast(kUint16, kUint32);
-  Cast(kUint16, kInt32);
-
-  Cast(kInt32, kUint32);
-  Cast(kUint32, kInt32);
-  Cast(kInt32, kInt64);
-  Cast(kUint32, kUint64);
-  Cast(kUint32, kInt64);
-  Cast(kInt32, kF32);
-  Cast(kUint32, kF32);
-  Cast(kF32, kF64);
-
-  Cast(kInt64, kUint64);
-  Cast(kUint64, kInt64);
-  Cast(kInt64, kF64);
-  Cast(kUint64, kF64);
-
-  std::fill(layer, layer + kPrimitiveVariableTypeCount, -1);
-  layer[static_cast<uint8_t>(PrimitiveVariableType::kF64)] = 0;
-  std::queue<uint8_t> q;
-  q.push(static_cast<uint8_t>(PrimitiveVariableType::kF64));
-  while (!q.empty()) {
-    uint8_t v = q.front();
-    q.pop();
-    for (uint8_t u : rg[v]) {
-      if (layer[u] > layer[v] + 1) {
-        layer[u] = layer[v] + 1;
-        q.push(u);
-      }
-    }
-  }
-
-  for (uint8_t x = 0; x < kPrimitiveVariableTypeCount; ++x)
-    for (uint8_t y = 0; y < kPrimitiveVariableTypeCount; ++y)
-      can_cast[x][y] = -1;
-
-  for (uint8_t x = 0; x < kPrimitiveVariableTypeCount; ++x) {
-    for (PrimitiveVariableType type : up_cast[x]) {
-      if (can_cast[x][static_cast<uint8_t>(type)] != 0)
-        can_cast[x][static_cast<uint8_t>(type)] = 0;
-      if (can_cast[static_cast<uint8_t>(type)][x] == -1)
-        can_cast[static_cast<uint8_t>(type)][x] = 1;
-    }
-  }
-  for (uint8_t through = 0; through < kPrimitiveVariableTypeCount; ++through) {
-    for (uint8_t a = 0; a < kPrimitiveVariableTypeCount; ++a) {
-      for (uint8_t b = 0; b < kPrimitiveVariableTypeCount; ++b) {
-        if (can_cast[a][through] != -1 && can_cast[through][b] != -1) {
-          int8_t x = can_cast[a][through] || can_cast[through][b];
-          if (can_cast[a][b] == -1 || x < can_cast[a][b])
-            can_cast[a][b] = x;
-        }
-      }
-    }
-  }
-
+#define SetLayer(type, val) layer[static_cast<uint8_t>(PrimitiveVariableType::type)] = val
+  SetLayer(kBool, 0);
+  SetLayer(kChar, 0);
+  SetLayer(kInt8, 1);
+  SetLayer(kUint8, 2);
+  SetLayer(kInt16, 3);
+  SetLayer(kUint16, 4);
+  SetLayer(kInt32, 5);
+  SetLayer(kUint32, 6);
+  SetLayer(kInt64, 7);
+  SetLayer(kUint64, 8);
+  SetLayer(kF32, 9);
+  SetLayer(kF64, 10);
+#undef SetLayer
   set_up_casting = true;
 }
 
 int8_t CastValue(const std::shared_ptr<TIDVariableType> & from, const std::shared_ptr<TIDVariableType> & to) {
-  if (from == to) return 0;
+  if (from == to) return 1;
   if (from == nullptr || to == nullptr) return -1;
-  if ((from->IsConst() && !to->IsConst()) || (!from->IsReference() && to->IsReference()))
-    return -1;
+//  if ((from->IsConst() && !to->IsConst()) || (!from->IsReference() && to->IsReference()))
+//    return -1;
   if (from->GetType() != to->GetType()) return -1;
   if (from->GetType() != VariableType::kPrimitive) {
     // we don't cast complex structs and functions, also arrays, but can if we really want
     // however pointers - we do convert these, type punning go weeeeeeeeee
-    return from->GetType() == VariableType::kPointer ? 0 : -1;
+    return from->GetType() == VariableType::kPointer ? 1 : -1;
   }
   // which primitives we can cast to which
   if (!set_up_casting) SetUpCastingPrimitives();
   PrimitiveVariableType from_pr = std::static_pointer_cast<TIDPrimitiveVariableType>(from)->GetPrimitiveType();
   PrimitiveVariableType to_pr = std::static_pointer_cast<TIDPrimitiveVariableType>(to)->GetPrimitiveType();
-  return can_cast[static_cast<uint8_t>(from_pr)][static_cast<uint8_t>(to_pr)];
+  //return can_cast[static_cast<uint8_t>(from_pr)][static_cast<uint8_t>(to_pr)];
+  return GetSizeOfPrimitive(from_pr) <= GetSizeOfPrimitive(to_pr);
 }
 
 bool CanCastLossless(const std::shared_ptr<TIDVariableType> & from, const std::shared_ptr<TIDVariableType> & to) {
-  return CastValue(from, to) == 0;
+  return CastValue(from, to) == 1;
 }
 
 bool CanCast(const std::shared_ptr<TIDVariableType> & from, const std::shared_ptr<TIDVariableType> & to) {
   return CastValue(from, to) != -1;
 }
 
-// Omits const and ref types, be careful with those
-std::shared_ptr<TIDVariableType> LeastCommonType(std::shared_ptr<TIDVariableType> lhs,
-    std::shared_ptr<TIDVariableType> rhs) {
-  if (lhs == nullptr || rhs == nullptr) return {};
-  lhs = SetParamsToType(lhs, false, false);
-  rhs = SetParamsToType(rhs, false, false);
-  if (lhs == rhs) return lhs;
-  if (CanCastLossless(lhs, rhs)) return rhs;
-  if (CanCastLossless(rhs, lhs)) return lhs;
-  if (lhs->GetType() != VariableType::kPrimitive || rhs->GetType() != VariableType::kPrimitive || !CanCast(lhs, rhs))
-    return {};
-  PrimitiveVariableType type1 = std::static_pointer_cast<TIDPrimitiveVariableType>(lhs)->GetPrimitiveType();
-  PrimitiveVariableType type2 = std::static_pointer_cast<TIDPrimitiveVariableType>(rhs)->GetPrimitiveType();
-  uint8_t utype1 = static_cast<uint8_t>(type1);
-  uint8_t utype2 = static_cast<uint8_t>(type2);
+std::shared_ptr<TIDValue> CastValue(const std::shared_ptr<TIDValue> & val, std::shared_ptr<TIDVariableType> type) {
+  if (!type || !val->GetType())
+    return std::make_shared<TIDTemporaryValue>(nullptr);
+  type = SetParamsToType(type, val->GetType()->IsConst(), val->GetType()->IsReference());
+  if (!CanCast(val->GetType(), type))
+    throw UnableToCast(val, type);
+  if (val->GetType() == type) return val;
+  else return std::make_shared<TIDTemporaryValue>(SetParamsToType(type, true, false));
+}
 
-  int32_t closest = 255;
-  PrimitiveVariableType vert = PrimitiveVariableType::kUnknown;
-  for (PrimitiveVariableType type : types) {
-    auto utype = static_cast<uint8_t>(type);
-    auto mid_type = GetPrimitiveVariableType(type);
-    if (CanCastLossless(lhs, mid_type) && CanCastLossless(mid_type, rhs)
-        && std::max(layer[utype1] - layer[utype], layer[utype2] - layer[utype])) {
-      closest = std::max(layer[utype1] - layer[utype], layer[utype2] - layer[utype]);
-      vert = type;
+PrimitiveVariableType LeastCommonType(PrimitiveVariableType lhs, PrimitiveVariableType rhs) {
+  if (lhs == rhs) return lhs;
+  if (lhs == PrimitiveVariableType::kBool && rhs == PrimitiveVariableType::kChar ||
+      lhs == PrimitiveVariableType::kChar && rhs == PrimitiveVariableType::kBool)
+    return PrimitiveVariableType::kInt8;
+  uint8_t ulhs = static_cast<uint8_t>(lhs);
+  uint8_t urhs = static_cast<uint8_t>(rhs);
+  if (layer[ulhs] < layer[urhs]) return rhs;
+  else return lhs;
+}
+
+PrimitiveVariableType NumericTypeFromString(const std::wstring & val) {
+  bool is_decimal = false;
+  for (wchar_t ch : val)
+    if (ch == L'.')
+      is_decimal = true;
+  std::wstring suf;
+  for (size_t i = val.size() - 1; i > 0 && !std::isdigit(val[i]); --i) {
+    suf.push_back(val[i]);
+  }
+  if (is_decimal)
+    return suf.empty() ? PrimitiveVariableType::kF32 : PrimitiveVariableType::kF64;
+  else {
+    if (suf.empty()) return PrimitiveVariableType::kInt32;
+    bool us = false;
+    if (suf.back() == 'u' || suf.back() == 'U') {
+      us = true;
+      suf.pop_back();
+    }
+    if (suf.empty()) return PrimitiveVariableType::kUint32;
+    wchar_t ch = suf.back();
+    switch (ch) {
+      case 't':
+      case 'T':
+        return us ? PrimitiveVariableType::kUint8 : PrimitiveVariableType::kInt8;
+      case 's':
+      case 'S':
+        return us ? PrimitiveVariableType::kUint16 : PrimitiveVariableType::kInt16;
+      case 'i':
+      case 'I':
+        return us ? PrimitiveVariableType::kUint32 : PrimitiveVariableType::kInt32;
+      case 'l':
+      case 'L':
+        return us ? PrimitiveVariableType::kUint64 : PrimitiveVariableType::kInt64;
     }
   }
-  return GetPrimitiveVariableType(vert);
+  // should be unreachable
+  return PrimitiveVariableType::kInt32;
 }

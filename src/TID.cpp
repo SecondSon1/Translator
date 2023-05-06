@@ -3,6 +3,7 @@
 #include "exceptions.hpp"
 #include "operators.hpp"
 #include <memory>
+#include <string>
 
 uint32_t GetSizeOfPrimitive(const PrimitiveVariableType & type) {
   switch (type) {
@@ -163,9 +164,7 @@ std::shared_ptr<TIDVariableType> DerivePointerFromType(const std::shared_ptr<TID
   static std::map<std::shared_ptr<TIDVariableType>, std::shared_ptr<TIDVariableType>> cache;
   if (!type->IsConst() && !type->IsReference()) CreateIfNecessary(type);
   if (!cache.count(type)) {
-    cache[type] = std::make_shared<TIDPointerVariableType>(TIDPointerVariableType::Guard(0),
-                     SetReferenceToType(origin[type], true)
-                   );
+    cache[type] = std::make_shared<TIDPointerVariableType>(TIDPointerVariableType::Guard(0), origin[type]);
     CreateIfNecessary(cache[type]);
   }
   return SetParamsToType(cache[type], type->IsConst(), type->IsReference());
@@ -175,9 +174,7 @@ std::shared_ptr<TIDVariableType> DeriveArrayFromType(const std::shared_ptr<TIDVa
   static std::map<std::shared_ptr<TIDVariableType>, std::shared_ptr<TIDVariableType>> cache;
   if (!type->IsConst() && !type->IsReference()) CreateIfNecessary(type);
   if (!cache.count(type)) {
-    cache[type] = std::make_shared<TIDArrayVariableType>(TIDArrayVariableType::Guard(0),
-                      SetReferenceToType(origin[type], true)
-                   );
+    cache[type] = std::make_shared<TIDArrayVariableType>(TIDArrayVariableType::Guard(0), origin[type]);
     CreateIfNecessary(cache[type]);
   }
   return SetParamsToType(cache[type], type->IsConst(), type->IsReference());
@@ -212,15 +209,16 @@ std::shared_ptr<TIDVariableType> SetParamsToType(const std::shared_ptr<TIDVariab
   return GetTypeWithParameters(type, _const, _ref);
 }
 
-std::vector<std::shared_ptr<TIDVariableType>> GetDerivedTypes(const std::shared_ptr<TIDVariableType> & type) {
-  std::vector<std::shared_ptr<TIDVariableType>> result;
-  result.push_back(type);
+std::vector<std::shared_ptr<TIDValue>> GetDerivedTypes(const std::shared_ptr<TIDValue> & val) {
+  std::vector<std::shared_ptr<TIDValue>> result;
+  auto type = val->GetType();
+  result.push_back(val);
   if (type->IsReference())
-    result.push_back(SetReferenceToType(type, false));
+    result.push_back(std::make_shared<TIDTemporaryValue>(SetReferenceToType(type, false)));
   if (!type->IsConst())
-    result.push_back(SetConstToType(type, true));
+    result.push_back(std::make_shared<TIDTemporaryValue>(SetConstToType(type, true)));
   if (type->IsReference() && !type->IsConst())
-    result.push_back(SetParamsToType(type, true, false));
+    result.push_back(std::make_shared<TIDTemporaryValue>(SetParamsToType(type, true, false)));
   return result;
 }
 
@@ -231,20 +229,34 @@ void TID::AddScope() {
 void TID::RemoveScope() {
   if (nodes_.size() == 1)
     throw NoScopeAvailableError();
+  for (const auto & [name, variable] : nodes_.back().variables_)
+    next_address_ -= variable->GetType()->GetSize();
   nodes_.pop_back();
+  nodes_.back().child_node_cnt_++;
 }
-void TID::AddComplexStruct(const Lexeme & lexeme, const std::wstring & name,
-    const std::shared_ptr<TIDVariableType> & complex_struct) {
+void TID::AddComplexStruct(const Lexeme & lexeme, const std::shared_ptr<TIDVariableType> & complex_struct) {
   if (!complex_struct || complex_struct->GetType() != VariableType::kComplex)
     throw NotComplexStructError();
+  std::wstring name = std::static_pointer_cast<TIDComplexVariableType>(complex_struct)->GetName();
   if (nodes_.back().complex_structs_.count(name) || nodes_.back().variables_.count(name))
     throw ConflictingNames(lexeme);
   nodes_.back().complex_structs_[name] = complex_struct;
 }
 
 void TID::AddVariable(const Lexeme & lexeme, const std::wstring & name,
-    const std::shared_ptr<TIDVariableType> & variable) {
+    const std::shared_ptr<TIDVariableType> & type) {
+  if (!type)
+    throw VoidNotExpected(lexeme);
   if (nodes_.back().complex_structs_.count(name) || nodes_.back().variables_.count(name))
     throw ConflictingNames(lexeme);
-  nodes_.back().variables_[name] = variable;
+  std::shared_ptr<TIDVariable> var = std::make_shared<TIDVariable>(name, GetCurrentPrefix(), type, next_address_);
+  next_address_ += type->GetSize();
+  nodes_.back().variables_[name] = var;
+}
+
+std::wstring TID::GetCurrentPrefix() const {
+  std::wstring ans;
+  for (const TIDNode & node : nodes_)
+    ans += std::to_wstring(node.child_node_cnt_) + L"::";
+  return ans;
 }

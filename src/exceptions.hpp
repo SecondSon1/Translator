@@ -7,6 +7,78 @@
 #include "lexeme.hpp"
 #include "operators.hpp"
 
+
+// ======================================
+// === Our Errors (not user's code's) ===
+// ======================================
+
+class NoScopeAvailableError : public std::exception {
+ public:
+  NoScopeAvailableError() {}
+
+  const char* what() const noexcept override {
+    return "TID scope is already empty";
+  }
+};
+
+class NotComplexStructError : public std::exception {
+ public:
+  NotComplexStructError() {}
+
+  const char* what() const noexcept override {
+    return "Argument was not a complex struct";
+  }
+};
+
+class OperatorTypeMismatch : public std::exception {
+ public:
+  OperatorTypeMismatch(OperatorType expected, OperatorType got) : expected_(expected), got_(got) {}
+
+  OperatorType GetExpected() const { return expected_; }
+  OperatorType GetGot() const { return got_; }
+
+  const char* what() const noexcept override {
+    return "Incorrect getter type of operator called";
+  }
+
+ private:
+  OperatorType expected_, got_;
+};
+
+class ExpectedFunction : public std::exception {
+ public:
+  ExpectedFunction(const std::shared_ptr<TIDVariableType> got) : got_(got) {}
+
+  std::shared_ptr<TIDVariableType> GetGot() const { return got_; }
+
+  const char* what() const noexcept override {
+    return "Not a function was passed";
+  }
+
+ private:
+  std::shared_ptr<TIDVariableType> got_;
+};
+
+class UnableToCast : public std::exception {
+ public:
+  UnableToCast(const std::shared_ptr<TIDValue> & value, const std::shared_ptr<TIDVariableType> & type)
+    : value_(value), type_(type) {}
+
+  std::shared_ptr<TIDValue> GetValue() const { return value_; }
+  std::shared_ptr<TIDVariableType> GetType() const { return type_; }
+
+  const char* what() const noexcept override {
+    return "Unable cast given value to a given type";
+  }
+ private:
+  std::shared_ptr<TIDValue> value_;
+  std::shared_ptr<TIDVariableType> type_;
+};
+
+// =============================
+// === Now for user's errors ===
+// =============================
+
 class TranslatorError : public std::exception {
  public:
   TranslatorError(size_t index) : index_(index) {}
@@ -175,20 +247,44 @@ class ConflictingNames : public SemanticsAnalysisError {
 
 class UnknownOperator : public SemanticsAnalysisError {
  public:
-  UnknownOperator(const Lexeme & lexeme, Operator op) : SemanticsAnalysisError(lexeme), op_(op) {}
+  UnknownOperator(const Lexeme & lexeme, UnaryPrefixOperator op, const std::shared_ptr<TIDValue> & val)
+    : SemanticsAnalysisError(lexeme), op_(op), lhs_(val) {}
+  UnknownOperator(const Lexeme & lexeme, UnaryPostfixOperator op, const std::shared_ptr<TIDValue> & val)
+    : SemanticsAnalysisError(lexeme), op_(op), lhs_(val) {}
+  UnknownOperator(const Lexeme & lexeme, BinaryOperator op, const std::shared_ptr<TIDValue> & lhs,
+      const std::shared_ptr<TIDValue> & rhs)
+    : SemanticsAnalysisError(lexeme), op_(op), lhs_(lhs), rhs_(rhs) {}
 
   Operator GetOperator() const { return op_; }
 
-  std::shared_ptr<TIDVariableType> GetFirstType() const { return first_; }
+  // JUST FOR CLARITY, so we don't get tangled in this
 
-  std::shared_ptr<TIDVariableType> GetSecondType() const { return second_; }
+  // this function is called only and only when op is unary, else it will throw error
+  std::shared_ptr<TIDValue> GetValue() const {
+    if (op_.GetOperatorType() == OperatorType::kBinary)
+      throw OperatorTypeMismatch(OperatorType::kUnaryPrefix, op_.GetOperatorType());
+    return lhs_;
+  }
+
+  // these two are called when op is binary
+  std::shared_ptr<TIDValue> GetLHSValue() const {
+    if (op_.GetOperatorType() != OperatorType::kBinary)
+      throw OperatorTypeMismatch(OperatorType::kBinary, op_.GetOperatorType());
+    return lhs_;
+  }
+
+  std::shared_ptr<TIDValue> GetRHSValue() const {
+    if (op_.GetOperatorType() != OperatorType::kBinary)
+      throw OperatorTypeMismatch(OperatorType::kBinary, op_.GetOperatorType());
+    return rhs_;
+  }
 
   const char* what() const noexcept override {
     return "Operator does not operate on provided type(s)";
   }
  private:
   Operator op_;
-  std::shared_ptr<TIDVariableType> first_, second_;
+  std::shared_ptr<TIDValue> lhs_, rhs_; // if op_ is unary type is in lhs_
 };
 
 class TypeNotIterable : public SemanticsAnalysisError {
@@ -289,53 +385,3 @@ class FunctionParameterListDoesNotMatch : public SemanticsAnalysisError {
   std::vector<std::shared_ptr<TIDVariableType>> provided_;
 };
 
-// ======================================
-// === Our Errors (not user's code's) ===
-// ======================================
-
-class NoScopeAvailableError : public std::exception {
- public:
-  NoScopeAvailableError() {}
-
-  const char* what() const noexcept override {
-    return "TID scope is already empty";
-  }
-};
-
-class NotComplexStructError : public std::exception {
- public:
-  NotComplexStructError() {}
-
-  const char* what() const noexcept override {
-    return "Argument was not a complex struct";
-  }
-};
-
-class OperatorTypeMismatch : public std::exception {
- public:
-  OperatorTypeMismatch(OperatorType expected, OperatorType got) : expected_(expected), got_(got) {}
-
-  OperatorType GetExpected() const { return expected_; }
-  OperatorType GetGot() const { return got_; }
-
-  const char* what() const noexcept override {
-    return "Incorrect getter type of operator called";
-  }
-
- private:
-  OperatorType expected_, got_;
-};
-
-class ExpectedFunction : public std::exception {
- public:
-  ExpectedFunction(const std::shared_ptr<TIDVariableType> got) : got_(got) {}
-
-  std::shared_ptr<TIDVariableType> GetGot() const { return got_; }
-
-  const char* what() const noexcept override {
-    return "Not a function was passed";
-  }
-
- private:
-  std::shared_ptr<TIDVariableType> got_;
-};

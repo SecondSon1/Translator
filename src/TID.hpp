@@ -8,14 +8,14 @@
 #include "lexeme.hpp"
 
 enum class VariableType : uint8_t {
-  kPrimitive, kComplex, kFunction, kPointer, kArray, kNull
+  kPrimitive, kComplex, kFunction, kPointer, kArray
 };
 
 class TIDVariableType {
  public:
   virtual ~TIDVariableType() = default;
   VariableType GetType() const { return variable_type_; }
-  uint32_t GetSize() const { return size_; }
+  uint32_t GetSize() const { return ref_ ? 8 : size_; } // reference is implicit pointer
 
   bool IsConst() const { return const_; }
   bool IsReference() const { return ref_; }
@@ -85,6 +85,7 @@ class TIDComplexVariableType : public TIDVariableType {
 
   const std::vector<std::pair<std::wstring, std::shared_ptr<TIDVariableType>>> & GetContents() const { return contents_; }
 
+  std::wstring GetName() const { return name_; }
   std::shared_ptr<TIDVariableType> GetField(std::wstring & name) const;
 
   std::wstring ToString() const override;
@@ -149,11 +150,6 @@ class TIDArrayVariableType : public TIDVariableType {
   std::shared_ptr<TIDVariableType> value_;
 };
 
-class TIDNullVariableType : public TIDVariableType {
-  public:
-  TIDNullVariableType() : TIDVariableType(VariableType::kNull, 0) {}
-};
-
 std::shared_ptr<TIDVariableType> GetPrimitiveVariableType(PrimitiveVariableType type);
 std::shared_ptr<TIDVariableType> DerivePointerFromType(const std::shared_ptr<TIDVariableType> & type);
 std::shared_ptr<TIDVariableType> DeriveArrayFromType(const std::shared_ptr<TIDVariableType> & type);
@@ -162,11 +158,64 @@ std::shared_ptr<TIDVariableType> SetParamsToType(const std::shared_ptr<TIDVariab
 std::shared_ptr<TIDVariableType> SetConstToType(const std::shared_ptr<TIDVariableType> & type, bool _const);
 std::shared_ptr<TIDVariableType> SetReferenceToType(const std::shared_ptr<TIDVariableType> & type, bool _ref);
 
-std::vector<std::shared_ptr<TIDVariableType>> GetDerivedTypes(const std::shared_ptr<TIDVariableType> & type);
+
+enum class TIDValueType : uint8_t { // basically rvalue and lvalue (respectively)
+  kTemporary, kVariable
+};
+
+class TIDValue {
+ public:
+  virtual ~TIDValue() = default;
+
+  TIDValueType GetValueType() const { return value_type_; }
+  std::shared_ptr<TIDVariableType> GetType() const { return type_; }
+
+  virtual std::wstring ToString() const = 0;
+
+ protected:
+  TIDValue(TIDValueType value_type, const std::shared_ptr<TIDVariableType> & type)
+          : value_type_(value_type), type_(type) {}
+
+ private:
+  TIDValueType value_type_;
+  std::shared_ptr<TIDVariableType> type_;
+};
+
+class TIDTemporaryValue : public TIDValue {
+ public:
+  TIDTemporaryValue(const std::shared_ptr<TIDVariableType> & type) : TIDValue(TIDValueType::kTemporary, type) {}
+
+  std::wstring ToString() const override {
+    auto type = GetType();
+    return type ? type->ToString() : L"void";
+  }
+};
+
+class TIDVariable : public TIDValue {
+ public:
+  TIDVariable(const std::wstring & name, const std::wstring & internal_prefix, const std::shared_ptr<TIDVariableType> & type, uint32_t address)
+             : TIDValue(TIDValueType::kVariable, type), name_(name), internal_name_(internal_prefix + name), address_(address) {}
+
+  std::wstring GetName() const { return name_; }
+  std::wstring GetInternalName() const { return internal_name_; }
+  uint64_t GetAddress() const { return address_; }
+
+  std::wstring ToString() const override {
+    auto type = GetType();
+    return name_ + L": " + (type ? type->ToString() : L"void");
+  }
+
+ private:
+  std::wstring name_;
+  std::wstring internal_name_;
+  uint64_t address_;
+};
+
+std::vector<std::shared_ptr<TIDValue>> GetDerivedTypes(const std::shared_ptr<TIDValue> & type);
 
 class TID {
  public:
-  TID() { AddScope(); }
+  TID() : next_address_(0) { AddScope(); }
 
   // All of them will return nullptr in std::shared_ptr if complex struct/variable is not found
   std::shared_ptr<const TIDVariableType> GetComplexStruct(const std::wstring & name) const {
@@ -180,30 +229,36 @@ class TID {
     return std::const_pointer_cast<TIDVariableType>(const_cast<const TID &>(*this).GetComplexStruct(name));
   }
 
-  std::shared_ptr<const TIDVariableType> GetVariable(const std::wstring & name) const {
+  std::shared_ptr<const TIDVariable> GetVariable(const std::wstring & name) const {
     for (size_t scope_index = nodes_.size() - 1; ~scope_index; --scope_index)
       if (nodes_[scope_index].variables_.count(name))
-        return SetReferenceToType(nodes_[scope_index].variables_.at(name), true);
+        return nodes_[scope_index].variables_.at(name);
     // Not found, returning empty variable
     return {};
   }
-  std::shared_ptr<TIDVariableType> GetVariable(const std::wstring & name) {
-    return std::const_pointer_cast<TIDVariableType>(const_cast<const TID &>(*this).GetVariable(name));
+  std::shared_ptr<TIDVariable> GetVariable(const std::wstring & name) {
+    return std::const_pointer_cast<TIDVariable>(const_cast<const TID &>(*this).GetVariable(name));
   }
 
  public:
   void AddScope();
   void RemoveScope();
-  void AddComplexStruct(const Lexeme & lexeme, const std::wstring & name,
+  void AddComplexStruct(const Lexeme & lexeme,
                         const std::shared_ptr<TIDVariableType> & complex_struct);
   void AddVariable(const Lexeme & lexeme, const std::wstring & name,
-                   const std::shared_ptr<TIDVariableType> & variable);
+                   const std::shared_ptr<TIDVariableType> & type);
+
+ private:
+  std::wstring GetCurrentPrefix() const;
 
  private:
   struct TIDNode {
     TIDNode() {}
     std::map<std::wstring, std::shared_ptr<TIDVariableType>> complex_structs_;
-    std::map<std::wstring, std::shared_ptr<TIDVariableType>> variables_;
+    std::map<std::wstring, std::shared_ptr<TIDVariable>> variables_;
+    uint32_t child_node_cnt_ = 0;
   };
+
   std::vector<TIDNode> nodes_;
+  uint64_t next_address_;
 };

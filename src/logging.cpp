@@ -3,6 +3,7 @@
 #include <iostream>
 
 #include "exceptions.hpp"
+#include "operators.hpp"
 #include "warnings.hpp"
 #include "lexeme.hpp"
 #include "terminal_formatting.hpp"
@@ -31,11 +32,28 @@ void printUnknownOperator(const TranslatorError &err) {
   const UnknownOperator *error = dynamic_cast<const UnknownOperator *>(&err);
   if (error == nullptr) return;
 
-  std::wcout << format::bright << " (" << format::reset;
-  std::wcout << format::bright << color::blue << "TYPE_1" << format::reset;
-  std::wcout << format::bright << " " << color::red << error->GetOperator().ToString() << " " << format::reset;
-  std::wcout << format::bright << color::blue << "TYPE_2" << format::reset;
-  std::wcout << format::bright << ')' << format::reset;
+  Operator op = error->GetOperator();
+  switch (op.GetOperatorType()) {
+    case OperatorType::kUnaryPrefix:
+      std::wcout << format::bright << " (" << format::reset;
+      std::wcout << format::bright << color::blue << error->GetValue()->ToString() << format::reset;
+      std::wcout << format::bright << " " << color::red << op.ToString() << format::reset;
+      std::wcout << format::bright << ')' << format::reset;
+      break;
+    case OperatorType::kUnaryPostfix:
+      std::wcout << format::bright << " (" << format::reset;
+      std::wcout << format::bright << color::red << op.ToString() << " " << format::reset;
+      std::wcout << format::bright << color::blue << error->GetValue()->ToString() << format::reset;
+      std::wcout << format::bright << ')' << format::reset;
+      break;
+    case OperatorType::kBinary:
+      std::wcout << format::bright << " (" << format::reset;
+      std::wcout << format::bright << color::blue << error->GetLHSValue()->ToString() << format::reset;
+      std::wcout << format::bright << " " << color::red << op.ToString() << " " << format::reset;
+      std::wcout << format::bright << color::blue << error->GetRHSValue()->ToString() << format::reset;
+      std::wcout << format::bright << ')' << format::reset;
+      break;
+  };
 }
 
 void printTypeMismatch(const TranslatorError &err) {
