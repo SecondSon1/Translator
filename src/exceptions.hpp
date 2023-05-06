@@ -1,6 +1,7 @@
 #pragma once
 
 #include <exception>
+#include <memory>
 #include <stdexcept>
 #include <string>
 #include "TID.hpp"
@@ -112,6 +113,15 @@ class StringNotEndedError : public LexicalAnalysisError {
 
   const char* what() const noexcept override {
     return "String literal not ended";
+  }
+};
+
+class CharIncorrectUsageError : public LexicalAnalysisError {
+ public:
+  CharIncorrectUsageError(size_t index) : LexicalAnalysisError(index) {}
+
+  const char* what() const noexcept override {
+    return "Character literal used incorrectly";
   }
 };
 
@@ -385,3 +395,47 @@ class FunctionParameterListDoesNotMatch : public SemanticsAnalysisError {
   std::vector<std::shared_ptr<TIDVariableType>> provided_;
 };
 
+class DeleteIncorrectUsage : public SemanticsAnalysisError {
+ public:
+  DeleteIncorrectUsage(const Lexeme & lexeme, const std::shared_ptr<TIDVariableType> & got)
+    : SemanticsAnalysisError(lexeme), got_(got) {}
+
+  std::shared_ptr<TIDVariableType> GetGotType() const { return got_; }
+
+  const char* what() const noexcept override {
+    return "Delete expected pointer or an array";
+  }
+
+ private:
+  std::shared_ptr<TIDVariableType> got_;
+};
+
+class ResizeIncorrectUsage : public SemanticsAnalysisError {
+ public:
+  ResizeIncorrectUsage(const Lexeme & lexeme, const std::shared_ptr<TIDVariableType> & got)
+    : SemanticsAnalysisError(lexeme), got_(got) {}
+
+  std::shared_ptr<TIDVariableType> GetGotType() const { return got_; }
+
+  const char* what() const noexcept override {
+    return "Resize expected a non-const array";
+  }
+
+ private:
+  std::shared_ptr<TIDVariableType> got_;
+};
+
+class SizeIncorrectUsage : public SemanticsAnalysisError {
+ public:
+  SizeIncorrectUsage(const Lexeme & lexeme, const std::shared_ptr<TIDVariableType> & got)
+    : SemanticsAnalysisError(lexeme), got_(got) {}
+
+  std::shared_ptr<TIDVariableType> GetGotType() const { return got_; }
+
+  const char* what() const noexcept override {
+    return "Size expected an array";
+  }
+
+ private:
+  std::shared_ptr<TIDVariableType> got_;
+};

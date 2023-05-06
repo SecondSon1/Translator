@@ -31,9 +31,12 @@ void SetUpCastingPrimitives() {
   set_up_casting = true;
 }
 
-int8_t CastValue(const std::shared_ptr<TIDVariableType> & from, const std::shared_ptr<TIDVariableType> & to) {
+int8_t CastValue(std::shared_ptr<TIDVariableType> from, std::shared_ptr<TIDVariableType> to) {
+  if (!from && !to) return 1;
+  if (!from || !to) return -1;
+  from = SetParamsToType(from, false, false);
+  to = SetParamsToType(to, false, false);
   if (from == to) return 1;
-  if (from == nullptr || to == nullptr) return -1;
 //  if ((from->IsConst() && !to->IsConst()) || (!from->IsReference() && to->IsReference()))
 //    return -1;
   if (from->GetType() != to->GetType()) return -1;
@@ -89,7 +92,7 @@ PrimitiveVariableType NumericTypeFromString(const std::wstring & val) {
     suf.push_back(val[i]);
   }
   if (is_decimal)
-    return suf.empty() ? PrimitiveVariableType::kF32 : PrimitiveVariableType::kF64;
+    return suf.empty() ? PrimitiveVariableType::kF64 : PrimitiveVariableType::kF32;
   else {
     if (suf.empty()) return PrimitiveVariableType::kInt32;
     bool us = false;

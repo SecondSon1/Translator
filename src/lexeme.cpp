@@ -40,6 +40,7 @@ std::wstring ToString(LexemeType type) {
     LexemeTypeCase(kParenthesis);
     LexemeTypeCase(kBracket);
     LexemeTypeCase(kStringLiteral);
+    LexemeTypeCase(kCharLiteral);
     LexemeTypeCase(kVariableType);
     LexemeTypeCase(kUnknown);
     LexemeTypeCase(kNull);

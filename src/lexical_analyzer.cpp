@@ -136,9 +136,15 @@ std::vector<Lexeme> PerformLexicalAnalysis(const std::wstring & code) {
           str.push_back(code[j++]);
       }
 
-      if (j >= code.size() || code[j] == L'\n')
-        throw StringNotEndedError(j);
-      result.emplace_back(LexemeType::kStringLiteral, str, i);
+      if (quote == L'"') {
+        if (j >= code.size() || code[j] == L'\n')
+          throw StringNotEndedError(j);
+        result.emplace_back(LexemeType::kStringLiteral, str, i);
+      } else {
+        if (j >= code.size() || code[j] == L'\n' || str.size() != 1)
+          throw CharIncorrectUsageError(j);
+        result.emplace_back(LexemeType::kCharLiteral, str, i);
+      }
       ++j;
     } else {
 

@@ -172,7 +172,7 @@ std::shared_ptr<TIDValue> UnaryPrefixOperation(UnaryPrefixOperator op, const std
   if (op == UnaryPrefixOperator::kDereference) {
     if (type->GetType() == VariableType::kPointer) {
       auto val_type = std::static_pointer_cast<TIDPointerVariableType>(type)->GetValue();
-      return std::make_shared<TIDTemporaryValue>(SetParamsToType(val_type, type->IsConst(), true));
+      return std::make_shared<TIDTemporaryValue>(SetReferenceToType(val_type, true));
     } else
       throw UnknownOperator(lexeme, op, val);
   }

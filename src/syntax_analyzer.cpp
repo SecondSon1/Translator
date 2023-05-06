@@ -56,6 +56,11 @@ void PerformSyntaxAnalysis(const std::vector<Lexeme> & code) {
   lexeme = code[0];
   eof = false;
   scope_return_type.push_back(GetPrimitiveVariableType(PrimitiveVariableType::kInt32));
+  std::vector<std::shared_ptr<TIDVariableType>> hoax_params;
+  tid.AddVariable(lexeme, L"new", std::make_shared<TIDFunctionVariableType>(nullptr, hoax_params, hoax_params));
+  tid.AddVariable(lexeme, L"resize", std::make_shared<TIDFunctionVariableType>(nullptr, hoax_params, hoax_params));
+  tid.AddVariable(lexeme, L"delete", std::make_shared<TIDFunctionVariableType>(nullptr, hoax_params, hoax_params));
+  tid.AddVariable(lexeme, L"size", std::make_shared<TIDFunctionVariableType>(nullptr, hoax_params, hoax_params));
   Program();
 }
 
@@ -99,6 +104,10 @@ std::shared_ptr<TIDVariableType> Function(const std::wstring & name,
                                           const std::shared_ptr<TIDVariableType> & return_type);
 std::shared_ptr<TIDVariableType> Type(bool complete_type = false);
 std::shared_ptr<TIDVariableType> TypeNoConst();
+std::shared_ptr<TIDValue> New();
+std::shared_ptr<TIDValue> Delete();
+std::shared_ptr<TIDValue> Resize();
+std::shared_ptr<TIDValue> Size();
 void If();
 void Elif();
 void Else();
@@ -298,10 +307,8 @@ std::vector<std::pair<std::wstring, std::shared_ptr<TIDVariableType>>> Definitio
     var_type = type;
     while (IsLexeme(LexemeType::kBracket, L"[")) {
       GetNext();
-      if (!IsLexeme(LexemeType::kBracket, L"]")) {
-        std::shared_ptr<TIDValue> ind_val = Expression();
-        Cast(ind_val->GetType(), SetConstToType(GetPrimitiveVariableType(PrimitiveVariableType::kUint32), true));
-      }
+      std::shared_ptr<TIDValue> ind_val = Expression();
+      Cast(ind_val->GetType(), SetConstToType(GetPrimitiveVariableType(PrimitiveVariableType::kUint32), true));
       Expect(LexemeType::kBracket, L"]");
       GetNext();
       var_type = DeriveArrayFromType(var_type);
@@ -542,8 +549,13 @@ void For() {
     Cast(val->GetType(), GetPrimitiveVariableType(PrimitiveVariableType::kBool));
   Expect(LexemeType::kPunctuation, L";");
   GetNext();
-  if (!IsLexeme(LexemeType::kParenthesis, L")"))
+  if (!IsLexeme(LexemeType::kParenthesis, L")")) {
     Expression();
+    while (IsLexeme(LexemeType::kPunctuation, L",")) {
+      GetNext();
+      Expression();
+    }
+  }
   Expect(LexemeType::kParenthesis, L")");
   GetNext();
   ++surrounding_loop_count;
@@ -666,6 +678,55 @@ void Return() {
   GetNext();
 }
 
+std::shared_ptr<TIDValue> New() {
+  Expect(LexemeType::kParenthesis, L"(");
+  GetNext();
+  std::shared_ptr<TIDVariableType> type = Type(true);
+  Expect(LexemeType::kParenthesis, L")");
+  GetNext();
+  return std::make_shared<TIDTemporaryValue>(SetConstToType(DerivePointerFromType(type), true));
+}
+
+std::shared_ptr<TIDValue> Delete() {
+  Expect(LexemeType::kParenthesis, L"(");
+  GetNext();
+  std::shared_ptr<TIDValue> val = Expression();
+  Expect(LexemeType::kParenthesis, L")");
+  auto var_type = val->GetType()->GetType();
+  if (var_type != VariableType::kPointer && var_type != VariableType::kArray)
+    throw DeleteIncorrectUsage(lexeme, val->GetType());
+  GetNext();
+  return std::make_shared<TIDTemporaryValue>(nullptr);
+}
+
+std::shared_ptr<TIDValue> Resize() {
+  Expect(LexemeType::kParenthesis, L"(");
+  GetNext();
+  std::shared_ptr<TIDValue> val = Expression();
+  Expect(LexemeType::kPunctuation, L",");
+  GetNext();
+  std::shared_ptr<TIDValue> size_val = Expression();
+  Expect(LexemeType::kParenthesis, L")");
+  Cast(size_val->GetType(), SetConstToType(GetPrimitiveVariableType(PrimitiveVariableType::kUint64), true));
+  auto type = val->GetType();
+  if (type->GetType() != VariableType::kArray || type->IsConst())
+    throw ResizeIncorrectUsage(lexeme, val->GetType());
+  GetNext();
+  return val;
+}
+
+std::shared_ptr<TIDValue> Size() {
+  Expect(LexemeType::kParenthesis, L"(");
+  GetNext();
+  std::shared_ptr<TIDValue> val = Expression();
+  Expect(LexemeType::kParenthesis, L")");
+  auto type = val->GetType();
+  if (type->GetType() != VariableType::kArray)
+    throw SizeIncorrectUsage(lexeme, val->GetType());
+  GetNext();
+  return std::make_shared<TIDTemporaryValue>(SetConstToType(GetPrimitiveVariableType(PrimitiveVariableType::kUint32), true));
+}
+
 void FunctionCall(const std::shared_ptr<TIDVariableType> & type) {
   debug("Function Call");
   if (type->GetType() != VariableType::kFunction)
@@ -748,20 +809,20 @@ std::shared_ptr<TIDValue> Priority1() {
 
 std::shared_ptr<TIDValue> Priority2() {
   auto val = Priority3();
-  while (IsLexeme(LexemeType::kOperator, L"&&")) {
+  while (IsLexeme(LexemeType::kOperator, L"||")) {
     GetNext();
     auto new_val = Priority3();
-    val = BinaryOperation(val, BinaryOperator::kLogicalAnd, new_val, lexeme);
+    val = BinaryOperation(val, BinaryOperator::kLogicalOr, new_val, lexeme);
   }
   return val;
 }
 
 std::shared_ptr<TIDValue> Priority3() {
   auto val = Priority4();
-  while (IsLexeme(LexemeType::kOperator, L"||")) {
+  while (IsLexeme(LexemeType::kOperator, L"&&")) {
     GetNext();
     auto new_val = Priority4();
-    val = BinaryOperation(val, BinaryOperator::kLogicalOr, new_val, lexeme);
+    val = BinaryOperation(val, BinaryOperator::kLogicalAnd, new_val, lexeme);
   }
   return val;
 }
@@ -917,14 +978,27 @@ std::shared_ptr<TIDValue> Priority13() {
       Cast(index_val->GetType(), SetConstToType(GetPrimitiveVariableType(PrimitiveVariableType::kUint32), true));
       Expect(LexemeType::kBracket, L"]");
       GetNext();
-      type = SetParamsToType(std::static_pointer_cast<TIDArrayVariableType>(type)->GetValue(), type->IsConst(), true);
+      type = SetReferenceToType(std::static_pointer_cast<TIDArrayVariableType>(type)->GetValue(), true);
       val = std::make_shared<TIDTemporaryValue>(type);
     } else if (IsLexeme(LexemeType::kParenthesis, L"(")) {
       if (!type || type->GetType() != VariableType::kFunction)
         throw TypeNotCallable(lexeme);
-      FunctionCall(type);
-      type = std::static_pointer_cast<TIDFunctionVariableType>(type)->GetReturnType();
-      val = std::make_shared<TIDTemporaryValue>(type);
+      std::wstring name;
+      if (val->GetValueType() == TIDValueType::kVariable)
+        name = std::static_pointer_cast<TIDVariable>(val)->GetName();
+      if (name == L"new") {
+        val = New();
+      } else if (name == L"delete") {
+        val = Delete();
+      } else if (name == L"resize") {
+        val = Resize();
+      } else if (name == L"size") {
+        val = Size();
+      } else {
+        FunctionCall(type);
+        val = std::make_shared<TIDTemporaryValue>(std::static_pointer_cast<TIDFunctionVariableType>(type)->GetReturnType());
+      }
+      type = val->GetType();
     } else if (IsLexeme(LexemeType::kOperator, L".")) {
       if (!type || type->GetType() != VariableType::kComplex)
         throw TypeNoMembers(lexeme);
@@ -946,7 +1020,7 @@ std::shared_ptr<TIDValue> Priority13() {
     } else if (IsLexeme(LexemeType::kReserved, L"as")) {
       GetNext();
       std::shared_ptr<TIDVariableType> new_type = Type(true);
-      Cast(type, new_type);
+      Cast(type, new_type, true);
       type = new_type;
       val = std::make_shared<TIDTemporaryValue>(type);
     } else
@@ -978,6 +1052,10 @@ std::shared_ptr<TIDValue> Priority14() {
     } else if (IsLexeme(LexemeType::kStringLiteral))
       val = std::make_shared<TIDTemporaryValue>(
           SetConstToType(DeriveArrayFromType(GetPrimitiveVariableType(PrimitiveVariableType::kChar)), true)
+      );
+    else if (IsLexeme(LexemeType::kCharLiteral))
+      val = std::make_shared<TIDTemporaryValue>(
+          SetConstToType(GetPrimitiveVariableType(PrimitiveVariableType::kChar), true)
       );
     else if (IsLexeme(LexemeType::kReserved, L"true") || IsLexeme(LexemeType::kReserved, L"false"))
       val = std::make_shared<TIDTemporaryValue>(

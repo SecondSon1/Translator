@@ -1,0 +1,14 @@
+struct Point {
+  f32 x = 0.0f, y = 0.0f;
+};
+uint32 n = 10;
+Point points[n];
+Point *sum = new(Point);
+foreach (Point pt of points) {
+  (*sum).x += pt.x;
+  (*sum).y += pt.y;
+}
+resize(points, n * 2);
+delete(sum);
+delete(points);
+
