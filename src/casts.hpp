@@ -10,3 +10,5 @@ std::shared_ptr<TIDValue> CastValue(const std::shared_ptr<TIDValue> & val, std::
 PrimitiveVariableType LeastCommonType(PrimitiveVariableType lhs, PrimitiveVariableType rhs);
 
 PrimitiveVariableType NumericTypeFromString(const std::wstring & val);
+uint64_t IntegerFromString(const std::wstring & val, PrimitiveVariableType type);
+uint64_t DecimalFromString(const std::wstring & val, PrimitiveVariableType type);

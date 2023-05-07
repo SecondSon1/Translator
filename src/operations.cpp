@@ -1,6 +1,7 @@
 #include "operations.hpp"
 
 #include "TID.hpp"
+#include "generation.hpp"
 #include "operators.hpp"
 #include "exceptions.hpp"
 #include "casts.hpp"
@@ -47,10 +48,10 @@ void SetUpUnaryOperations() {
       unary_operations[static_cast<uint8_t>(UnaryPrefixOperator::kIncrement)][{ TIDValueType::kTemporary, ref_type }] = ref_type;
       unary_operations[static_cast<uint8_t>(UnaryPrefixOperator::kDecrement)][{ TIDValueType::kVariable, type }] = ref_type;
       unary_operations[static_cast<uint8_t>(UnaryPrefixOperator::kDecrement)][{ TIDValueType::kTemporary, ref_type }] = ref_type;
-      unary_operations[static_cast<uint8_t>(UnaryPostfixOperator::kIncrement)][{ TIDValueType::kVariable, type }] = ref_type;
-      unary_operations[static_cast<uint8_t>(UnaryPostfixOperator::kIncrement)][{ TIDValueType::kTemporary, ref_type }] = ref_type;
-      unary_operations[static_cast<uint8_t>(UnaryPostfixOperator::kDecrement)][{ TIDValueType::kVariable, type }] = ref_type;
-      unary_operations[static_cast<uint8_t>(UnaryPostfixOperator::kDecrement)][{ TIDValueType::kTemporary, ref_type }] = ref_type;
+      unary_operations[static_cast<uint8_t>(UnaryPostfixOperator::kIncrement)][{ TIDValueType::kVariable, type }] = const_type;
+      unary_operations[static_cast<uint8_t>(UnaryPostfixOperator::kIncrement)][{ TIDValueType::kTemporary, ref_type }] = const_type;
+      unary_operations[static_cast<uint8_t>(UnaryPostfixOperator::kDecrement)][{ TIDValueType::kVariable, type }] = const_type;
+      unary_operations[static_cast<uint8_t>(UnaryPostfixOperator::kDecrement)][{ TIDValueType::kTemporary, ref_type }] = const_type;
 
       unary_operations[static_cast<uint8_t>(UnaryPrefixOperator::kInvert)][{ TIDValueType::kVariable, type }] = const_bool_type;
       unary_operations[static_cast<uint8_t>(UnaryPrefixOperator::kInvert)][{ TIDValueType::kTemporary, type }] = const_bool_type;
@@ -281,4 +282,126 @@ std::shared_ptr<TIDValue> BinaryOperation(const std::shared_ptr<TIDValue> & lhs,
   }
 
   throw UnknownOperator(lexeme, op, lhs, rhs);
+}
+std::shared_ptr<TIDValue> UnaryPrefixOperationRPN(UnaryPrefixOperator op,
+    const std::shared_ptr<TIDValue> & type, const Lexeme & lexeme, RPN & rpn) {
+  std::shared_ptr<TIDValue> result = UnaryPrefixOperation(op, type, lexeme);
+  switch (op) {
+    case UnaryPrefixOperator::kIncrement:
+      rpn.PushNode(RPNOperatorNode(RPNOperatorType::kLoad, PrimitiveVariableType::kUint64));
+      rpn.PushNode(RPNOperandNode(1));
+      rpn.PushNode(RPNOperatorNode(RPNOperatorType::kAdd));
+      // TODO
+      rpn.PushNode(RPNOperandNode(69));
+      break;
+    case UnaryPrefixOperator::kDecrement:
+      break;
+    case UnaryPrefixOperator::kPlus:
+      // Nothing lol
+      break;
+    case UnaryPrefixOperator::kMinus:
+      if (type->GetValueType() == TIDValueType::kVariable || type->GetType()->IsReference())
+        rpn.PushNode(RPNOperatorNode(RPNOperatorType::kLoad, PrimitiveVariableType::kUint64));
+      rpn.PushNode(RPNOperatorNode(RPNOperatorType::kMinus, GetTypeOfVariable(type->GetType())));
+      break;
+    case UnaryPrefixOperator::kInvert:
+      rpn.PushNode(RPNOperatorNode(RPNOperatorType::kToBool, GetTypeOfVariable(type->GetType())));
+      rpn.PushNode(RPNOperatorNode(RPNOperatorType::kInvert));
+      break;
+    case UnaryPrefixOperator::kTilda:
+      rpn.PushNode(RPNOperatorNode(RPNOperatorType::kTilda, GetTypeOfVariable(type->GetType())));
+      break;
+    case UnaryPrefixOperator::kDereference:
+      break;
+    case UnaryPrefixOperator::kAddressOf:
+      break;
+    case UnaryPrefixOperator::kUnknown:
+      throw UnknownOperator(lexeme, op, type);
+  }
+  return result;
+}
+std::shared_ptr<TIDValue> UnaryPostfixOperationRPN(const std::shared_ptr<TIDValue> & type, 
+    UnaryPostfixOperator op, const Lexeme & lexeme, RPN & rpn) {
+  std::shared_ptr<TIDValue> result = UnaryPostfixOperation(type, op, lexeme);
+  switch (op) {
+    case UnaryPostfixOperator::kIncrement:
+      break;
+    case UnaryPostfixOperator::kDecrement:
+      break;
+    case UnaryPostfixOperator::kUnknown:
+      throw UnknownOperator(lexeme, op, type);
+  }
+  return result;
+}
+std::shared_ptr<TIDValue> BinaryOperationRPN(const std::shared_ptr<TIDValue> & lhs, BinaryOperator op,
+    const std::shared_ptr<TIDValue> & rhs, const Lexeme & lexeme, RPN & rpn) {
+  std::shared_ptr<TIDValue> result = BinaryOperation(lhs, op, rhs, lexeme);
+  switch (op) {
+    case BinaryOperator::kFunctionCall:
+    case BinaryOperator::kSubscript:
+    case BinaryOperator::kMemberAccess:
+      // op should never be one of those, I could've put assert(false) here but won't
+      break;
+    case BinaryOperator::kMultiplication:
+      break;
+    case BinaryOperator::kDivision:
+      break;
+    case BinaryOperator::kModulus:
+      break;
+    case BinaryOperator::kAddition:
+      break;
+    case BinaryOperator::kSubtraction:
+      break;
+    case BinaryOperator::kBitwiseShiftLeft:
+      break;
+    case BinaryOperator::kBitwiseShiftRight:
+      break;
+    case BinaryOperator::kLess:
+      break;
+    case BinaryOperator::kMore:
+      break;
+    case BinaryOperator::kLessOrEqual:
+      break;
+    case BinaryOperator::kMoreOrEqual:
+      break;
+    case BinaryOperator::kEqual:
+      break;
+    case BinaryOperator::kNotEqual:
+      break;
+    case BinaryOperator::kBitwiseAnd:
+      break;
+    case BinaryOperator::kBitwiseXor:
+      break;
+    case BinaryOperator::kBitwiseOr:
+      break;
+    case BinaryOperator::kLogicalAnd:
+      break;
+    case BinaryOperator::kLogicalOr:
+      break;
+    case BinaryOperator::kAssignment:
+      break;
+    case BinaryOperator::kAdditionAssignment:
+      break;
+    case BinaryOperator::kSubtractionAssignment:
+      break;
+    case BinaryOperator::kMultiplicationAssignment:
+      break;
+    case BinaryOperator::kDivisionAssignment:
+      break;
+    case BinaryOperator::kModulusAssignment:
+      break;
+    case BinaryOperator::kBitwiseShiftLeftAssignment:
+      break;
+    case BinaryOperator::kBitwiseShiftRightAssignment:
+      break;
+    case BinaryOperator::kBitwiseAndAssignment:
+      break;
+    case BinaryOperator::kBitwiseOrAssignment:
+      break;
+    case BinaryOperator::kBitwiseXorAssignment:
+      break;
+    case BinaryOperator::kUnknown:
+      throw UnknownOperator(lexeme, op, lhs, rhs);
+  }
+  return result;
 }

@@ -3,6 +3,7 @@
 #include "exceptions.hpp"
 
 #include <queue>
+#include <cassert>
 
 bool set_up_casting = false;
 
@@ -119,4 +120,90 @@ PrimitiveVariableType NumericTypeFromString(const std::wstring & val) {
   }
   // should be unreachable
   return PrimitiveVariableType::kInt32;
+}
+
+uint64_t value[1 << 16];
+void SetUpValue() {
+  static bool set_up = false;
+  if (!set_up) {
+    std::fill(value, value + (1 << 16), -1);
+    value[L'0'] = 0;
+    value[L'1'] = 1;
+    value[L'2'] = 2;
+    value[L'3'] = 3;
+    value[L'4'] = 4;
+    value[L'5'] = 5;
+    value[L'6'] = 6;
+    value[L'7'] = 7;
+    value[L'8'] = 8;
+    value[L'9'] = 9;
+    value[L'a'] = value[L'A'] = 10;
+    value[L'b'] = value[L'B'] = 11;
+    value[L'c'] = value[L'C'] = 12;
+    value[L'd'] = value[L'D'] = 13;
+    value[L'e'] = value[L'E'] = 14;
+    value[L'f'] = value[L'F'] = 15;
+    set_up = true;
+  }
+}
+
+uint64_t IntegerFromString(const std::wstring & val, PrimitiveVariableType type) {
+  SetUpValue();
+  uint64_t num = 0;
+  uint64_t base = 10;
+  size_t i = 0;
+  if (val.size() > 2 && val[0] == L'0' && val[1] == L'x') {
+    base = 16;
+    i = 2;
+  }
+  for (; i < val.size(); ++i) {
+    num *= base;
+    num += value[val[i]];
+  }
+
+  switch (type) {
+    case PrimitiveVariableType::kInt8:
+    case PrimitiveVariableType::kUint8:
+      num &= (1ll << 8) - 1;
+      break;
+    case PrimitiveVariableType::kInt16:
+    case PrimitiveVariableType::kUint16:
+      num &= (1ll << 16) - 1;
+      break;
+    case PrimitiveVariableType::kInt32:
+    case PrimitiveVariableType::kUint32:
+      num &= (1ll << 32) - 1;
+      break;
+    case PrimitiveVariableType::kInt64:
+    case PrimitiveVariableType::kUint64:
+      break;
+    default:
+      assert(false); // :)
+  }
+  return num;
+}
+
+uint64_t DecimalFromString(const std::wstring & val, PrimitiveVariableType type) {
+  SetUpValue();
+  uint64_t result;
+  std::string number;
+  number.resize(val.size());
+  for (size_t i = 0; i < val.size(); ++i)
+    number[i] = static_cast<char>(val[i]);
+  if (number.back() == 'f') number.pop_back();
+  double num = std::stod(number);
+  switch (type) {
+    case PrimitiveVariableType::kF32:
+      {
+        float num_fl = static_cast<float>(num);
+        result = *reinterpret_cast<uint32_t*>(&num_fl);
+      }
+      break;
+    case PrimitiveVariableType::kF64:
+      result = *reinterpret_cast<uint64_t*>(&num);
+      break;
+    default:
+      assert(false); // :)
+  }
+  return result;
 }

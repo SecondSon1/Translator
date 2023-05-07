@@ -86,12 +86,14 @@ int32_t main(const int argc, const char *argv[]) {
   codeFile.close();
   log::init(code, options);
 
+  RPN rpn;
+
   try {
     std::vector<Lexeme> lexemes = PerformLexicalAnalysis(code);
     for (Lexeme lexeme : lexemes)
       if (lexeme.GetType() == LexemeType::kUnknown)
         throw UnknownLexeme(lexeme.GetIndex(), lexeme.GetValue());
-    PerformSyntaxAnalysis(lexemes);
+    rpn = PerformSyntaxAnalysis(lexemes);
   }
   catch (const TranslatorError & e) {
     log::error(e);
@@ -105,6 +107,9 @@ int32_t main(const int argc, const char *argv[]) {
   }
   std::wcout << format::bright << color::green << '0' << format::reset << " error(s) were found" << std::endl;
   std::wcout << format::bright << color::blue << log::getWarningsNum() << format::reset << " warning(s) were generated" << std::endl;
+  std::wcout << std::endl << "Generated RPN:" << std::endl;
+  for (auto x : rpn.GetNodes())
+    std::wcout << x->ToString() << std::endl;
 
   return 0;
 }

@@ -87,6 +87,7 @@ class TIDComplexVariableType : public TIDVariableType {
 
   std::wstring GetName() const { return name_; }
   std::shared_ptr<TIDVariableType> GetField(std::wstring & name) const;
+  uint32_t GetOffset(std::wstring & name) const;
 
   std::wstring ToString() const override;
 
@@ -215,7 +216,7 @@ std::vector<std::shared_ptr<TIDValue>> GetDerivedTypes(const std::shared_ptr<TID
 
 class TID {
  public:
-  TID() : next_address_(0) { AddScope(); }
+  TID() { AddScope(); }
 
   // All of them will return nullptr in std::shared_ptr if complex struct/variable is not found
   std::shared_ptr<const TIDVariableType> GetComplexStruct(const std::wstring & name) const {
@@ -240,13 +241,24 @@ class TID {
     return std::const_pointer_cast<TIDVariable>(const_cast<const TID &>(*this).GetVariable(name));
   }
 
+  std::shared_ptr<const TIDVariable> GetVariableFromCurrentScope(const std::wstring & name) const {
+    const auto & vars = nodes_.back().variables_;
+    return vars.count(name) ? vars.at(name) : nullptr;
+  }
+  std::shared_ptr<TIDVariable> GetVariableFromCurrentScope(const std::wstring & name) {
+    return std::const_pointer_cast<TIDVariable>(const_cast<const TID &>(*this).GetVariableFromCurrentScope(name));
+  }
+
  public:
   void AddScope();
+  void AddFunctionScope(const std::shared_ptr<TIDVariableType> & return_type);
   void RemoveScope();
   void AddComplexStruct(const Lexeme & lexeme,
                         const std::shared_ptr<TIDVariableType> & complex_struct);
   void AddVariable(const Lexeme & lexeme, const std::wstring & name,
                    const std::shared_ptr<TIDVariableType> & type);
+  uint64_t AddTemporaryStructInstance(const Lexeme & lexeme,
+                                  const std::shared_ptr<TIDVariableType> & type);
 
  private:
   std::wstring GetCurrentPrefix() const;
@@ -257,8 +269,9 @@ class TID {
     std::map<std::wstring, std::shared_ptr<TIDVariableType>> complex_structs_;
     std::map<std::wstring, std::shared_ptr<TIDVariable>> variables_;
     uint32_t child_node_cnt_ = 0;
+    uint64_t next_address_ = 0;
   };
 
+  uint32_t temp_structs = 0;
   std::vector<TIDNode> nodes_;
-  uint64_t next_address_;
 };

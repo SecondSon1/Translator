@@ -68,6 +68,15 @@ std::shared_ptr<TIDVariableType> TIDComplexVariableType::GetField(std::wstring &
       return value;
   return { };
 }
+uint32_t TIDComplexVariableType::GetOffset(std::wstring & name) const {
+  uint32_t offset = 0;
+  for (auto [field_name, value] : contents_) {
+    if (field_name == name)
+      return offset;
+    offset += value->GetSize();
+  }
+  return offset;
+}
 
 std::wstring TIDPrimitiveVariableType::ToString() const {
   return ::ToString(type_);
@@ -224,13 +233,18 @@ std::vector<std::shared_ptr<TIDValue>> GetDerivedTypes(const std::shared_ptr<TID
 
 void TID::AddScope() {
   nodes_.emplace_back();
+  nodes_.back().next_address_ = nodes_[nodes_.size() - 2].next_address_;
+}
+
+void TID::AddFunctionScope(const std::shared_ptr<TIDVariableType> & return_type) {
+  nodes_.emplace_back();
+  uint32_t size_for_return = return_type ? return_type->GetSize() + 1 : 0;
+  nodes_.back().next_address_ = size_for_return + 8 /* first 8 bytes are pointer for where to return after function is complete */;
 }
 
 void TID::RemoveScope() {
   if (nodes_.size() == 1)
     throw NoScopeAvailableError();
-  for (const auto & [name, variable] : nodes_.back().variables_)
-    next_address_ -= variable->GetType()->GetSize();
   nodes_.pop_back();
   nodes_.back().child_node_cnt_++;
 }
@@ -249,9 +263,20 @@ void TID::AddVariable(const Lexeme & lexeme, const std::wstring & name,
     throw VoidNotExpected(lexeme);
   if (nodes_.back().complex_structs_.count(name) || nodes_.back().variables_.count(name))
     throw ConflictingNames(lexeme);
-  std::shared_ptr<TIDVariable> var = std::make_shared<TIDVariable>(name, GetCurrentPrefix(), type, next_address_);
-  next_address_ += type->GetSize();
+  std::shared_ptr<TIDVariable> var = std::make_shared<TIDVariable>(name, GetCurrentPrefix(), type,
+      nodes_.back().next_address_);
+  nodes_.back().next_address_ += type->GetSize();
   nodes_.back().variables_[name] = var;
+}
+uint64_t TID::AddTemporaryStructInstance([[maybe_unused]] const Lexeme & lexeme,
+                                     const std::shared_ptr<TIDVariableType> & type) {
+  if (!type || type->GetType() != VariableType::kComplex)
+    throw NotComplexStructError();
+  std::wstring name = L"$" + std::to_wstring(temp_structs++);
+  std::shared_ptr<TIDVariable> var = std::make_shared<TIDVariable>(name, GetCurrentPrefix(), type,
+      nodes_.back().next_address_);
+  nodes_.back().next_address_ += type->GetSize();
+  return nodes_.back().next_address_ - type->GetSize();
 }
 
 std::wstring TID::GetCurrentPrefix() const {

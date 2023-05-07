@@ -395,6 +395,21 @@ class FunctionParameterListDoesNotMatch : public SemanticsAnalysisError {
   std::vector<std::shared_ptr<TIDVariableType>> provided_;
 };
 
+class NewIncorrectUsage : public SemanticsAnalysisError {
+ public:
+  NewIncorrectUsage(const Lexeme & lexeme, const std::shared_ptr<TIDVariableType> & got)
+    : SemanticsAnalysisError(lexeme), got_(got) {}
+
+  std::shared_ptr<TIDVariableType> GetGotType() const { return got_; }
+
+  const char* what() const noexcept override {
+    return "Usage: new(x) - returns x*, where x is a type; new(x, size) - returns x[], where x is an array type, size is an integer";
+  }
+
+ private:
+  std::shared_ptr<TIDVariableType> got_;
+};
+
 class DeleteIncorrectUsage : public SemanticsAnalysisError {
  public:
   DeleteIncorrectUsage(const Lexeme & lexeme, const std::shared_ptr<TIDVariableType> & got)
@@ -403,22 +418,7 @@ class DeleteIncorrectUsage : public SemanticsAnalysisError {
   std::shared_ptr<TIDVariableType> GetGotType() const { return got_; }
 
   const char* what() const noexcept override {
-    return "Delete expected pointer or an array";
-  }
-
- private:
-  std::shared_ptr<TIDVariableType> got_;
-};
-
-class ResizeIncorrectUsage : public SemanticsAnalysisError {
- public:
-  ResizeIncorrectUsage(const Lexeme & lexeme, const std::shared_ptr<TIDVariableType> & got)
-    : SemanticsAnalysisError(lexeme), got_(got) {}
-
-  std::shared_ptr<TIDVariableType> GetGotType() const { return got_; }
-
-  const char* what() const noexcept override {
-    return "Resize expected a non-const array";
+    return "Usage: delete(x), where x is a pointer or an array";
   }
 
  private:
@@ -433,7 +433,7 @@ class SizeIncorrectUsage : public SemanticsAnalysisError {
   std::shared_ptr<TIDVariableType> GetGotType() const { return got_; }
 
   const char* what() const noexcept override {
-    return "Size expected an array";
+    return "Usage: size(x) - length of x where x is an array";
   }
 
  private:
