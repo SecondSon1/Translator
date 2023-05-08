@@ -41,11 +41,10 @@ TID tid;
 void GetNext() {
   _lexeme_index++;
   if (_lexeme_index == _lexemes.size()) {
-      eof = true;
-      lexeme = Lexeme(LexemeType::kNull, L"", lexeme.GetIndex() + lexeme.GetValue().size());
-  }
-  else
-      lexeme = _lexemes[_lexeme_index];
+    eof = true;
+    lexeme = Lexeme(LexemeType::kNull, L"", lexeme.GetIndex() + lexeme.GetValue().size());
+  } else
+    lexeme = _lexemes[_lexeme_index];
 }
 
 void Program();
@@ -60,14 +59,40 @@ RPN PerformSyntaxAnalysis(const std::vector<Lexeme> & code) {
   lexeme = code[0];
   eof = false;
   scope_return_type.push_back(GetPrimitiveVariableType(PrimitiveVariableType::kInt32));
-  std::vector<std::shared_ptr<TIDVariableType>> hoax_params;
-  tid.AddVariable(lexeme, L"new", std::make_shared<TIDFunctionVariableType>(nullptr, hoax_params, hoax_params));
-  tid.AddVariable(lexeme, L"delete", std::make_shared<TIDFunctionVariableType>(nullptr, hoax_params, hoax_params));
-  tid.AddVariable(lexeme, L"size", std::make_shared<TIDFunctionVariableType>(nullptr, hoax_params, hoax_params));
-  tid.AddVariable(lexeme, L"sizeof", std::make_shared<TIDFunctionVariableType>(nullptr, hoax_params, hoax_params));
+  rpn.push_back(std::make_shared<RPN>());
   Program();
+  // In TID function scope is still open
+  // This is size of global scope stack item
+  uint64_t global_stack_size = tid.GetFunctionScopeMaxAddress();
   RPN result;
-  // TODO: merge RPN from all functions
+  result.PushNode(RPNOperand(global_stack_size));
+  result.PushNode(RPNOperand(0));
+  result.PushNode(RPNOperator(RPNOperatorType::kPush));
+  result.PushNode(RPNOperand(-1ull));
+  result.PushNode(RPNOperator(RPNOperatorType::kSP));
+  result.PushNode(RPNOperator(RPNOperatorType::kStore, PrimitiveVariableType::kUint64));
+  for (std::shared_ptr<RPNNode> & node : rpn.back()->GetNodes())
+    result.PushNode(std::move(node));
+  AddReturn(result);
+  std::map<std::wstring, uint64_t> pc_by_name;
+  uint64_t pc = result.GetNodes().size();
+  for (auto & [name, cur_rpn] : func_rpn) {
+    pc_by_name[name] = pc;
+    for (auto & node : cur_rpn->GetNodes()) {
+      result.PushNode(std::move(node));
+      ++pc;
+    }
+    AddReturn(result);
+  }
+  for (auto & node : result.GetNodes()) {
+    if (node->GetNodeType() == NodeType::kReferenceOperand) {
+      std::wstring name = std::dynamic_pointer_cast<RPNReferenceOperand>(node)
+        ->GetName();
+      if (!pc_by_name.count(name))
+        throw VariableNotFoundByInternalName();
+      node = std::make_shared<RPNOperand>(pc_by_name[name]);
+    }
+  }
   return result;
 }
 
@@ -115,6 +140,8 @@ std::shared_ptr<TIDValue> New();
 std::shared_ptr<TIDValue> Delete();
 std::shared_ptr<TIDValue> Size();
 std::shared_ptr<TIDValue> Sizeof();
+std::shared_ptr<TIDValue> Read();
+std::shared_ptr<TIDValue> Write();
 void If();
 void Elif();
 void Else();
@@ -143,21 +170,23 @@ std::shared_ptr<TIDValue> Priority12();
 std::shared_ptr<TIDValue> Priority13();
 std::shared_ptr<TIDValue> Priority14();
 
-void Cast(const std::shared_ptr<TIDVariableType> & from, const std::shared_ptr<TIDVariableType> & to, [[maybe_unused]] bool suppress_downcast_warning = false) {
+void PushNode(const RPNOperand & node) { rpn.back()->PushNode(node); }
+void PushNode(const RPNReferenceOperand & node) { rpn.back()->PushNode(node); }
+void PushNode(const RPNOperator & node) { rpn.back()->PushNode(node); }
+void LoadType(const std::shared_ptr<TIDVariableType> & type, bool need_reference) {
+  if (type->GetType() != VariableType::kComplex && !need_reference)
+    PushNode(RPNOperator(RPNOperatorType::kLoad, GetTypeOfVariable(type)));
+}
+
+void Cast(const std::shared_ptr<TIDValue> & from, const std::shared_ptr<TIDVariableType> & to, [[maybe_unused]] bool suppress_downcast_warning = false) {
   if (!from && !to) return;
-  if (!from || !to || !CanCast(SetParamsToType(from, false, false), SetParamsToType(to, false, false)))
-    throw TypeMismatch(lexeme, to, from);
+  if (!from || !to || !CanCast(from, to))
+    throw TypeMismatch(lexeme, to, from->GetType());
 
   if (!suppress_downcast_warning && !CanCastLossless(from, to))
-    log::warning(Downcast(lexeme, from, to));
-}
-void PushNode(const RPNOperandNode & node) { rpn.back()->PushNode(node); }
-void PushNode(const RPNReferenceOperandNode & node) { rpn.back()->PushNode(node); }
-void PushNode(const RPNOperatorNode & node) { rpn.back()->PushNode(node); }
-void LoadType(const std::shared_ptr<TIDVariableType> & type) {
-  if (type->GetType() != VariableType::kComplex)
-    PushNode(RPNOperatorNode(RPNOperatorType::kLoad, type->GetType() == VariableType::kPrimitive ?
-          std::dynamic_pointer_cast<TIDPrimitiveVariableType>(type)->GetPrimitiveType() : PrimitiveVariableType::kUint64));
+    log::warning(Downcast(lexeme, from->GetType(), to));
+
+  Cast(from, to, *rpn.back());
 }
 
 void Program() {
@@ -170,7 +199,12 @@ void Program() {
 void Action() {
   debug("Action");
   debug(lexeme.GetValue());
-  if (IsLexeme(LexemeType::kReserved) || IsLexeme(LexemeType::kVariableType) ||
+  bool reserved = IsLexeme(LexemeType::kReserved);
+  if (IsLexeme(LexemeType::kReserved, L"new") || IsLexeme(LexemeType::kReserved, L"delete") ||
+      IsLexeme(LexemeType::kReserved, L"size") || IsLexeme(LexemeType::kReserved, L"sizeof") ||
+      IsLexeme(LexemeType::kReserved, L"read") || IsLexeme(LexemeType::kReserved, L"write"))
+    reserved = false;
+  if (reserved || IsLexeme(LexemeType::kVariableType) ||
       (IsLexeme(LexemeType::kIdentifier) && tid.GetComplexStruct(lexeme.GetValue()) != nullptr))
     Keyword();
   else if (IsLexeme(LexemeType::kPunctuation, L"{"))
@@ -294,7 +328,7 @@ std::pair<std::wstring, std::shared_ptr<TIDVariableType>> VariableIdentifier(std
     GetNext();
     if (!IsLexeme(LexemeType::kBracket, L"]")) {
       std::shared_ptr<TIDValue> ind_val = Expression();
-      Cast(ind_val->GetType(), SetConstToType(GetPrimitiveVariableType(PrimitiveVariableType::kUint32), true));
+      Cast(ind_val, SetConstToType(GetPrimitiveVariableType(PrimitiveVariableType::kUint32), true));
     }
     Expect(LexemeType::kBracket, L"]");
     GetNext();
@@ -305,7 +339,7 @@ std::pair<std::wstring, std::shared_ptr<TIDVariableType>> VariableIdentifier(std
 
 std::vector<std::pair<std::wstring, std::shared_ptr<TIDVariableType>>> Definition() {
   debug("Definition");
-  std::shared_ptr<TIDVariableType> type = Type();
+  std::shared_ptr<TIDVariableType> type = Type(true);
   std::shared_ptr<TIDVariableType> var_type;
   std::wstring name;
   std::vector<std::pair<std::wstring, std::shared_ptr<TIDVariableType>>> result;
@@ -323,7 +357,7 @@ std::vector<std::pair<std::wstring, std::shared_ptr<TIDVariableType>>> Definitio
     while (IsLexeme(LexemeType::kBracket, L"[")) {
       GetNext();
       std::shared_ptr<TIDValue> ind_val = Expression();
-      Cast(ind_val->GetType(), SetConstToType(GetPrimitiveVariableType(PrimitiveVariableType::kUint32), true));
+      Cast(ind_val, SetConstToType(GetPrimitiveVariableType(PrimitiveVariableType::kUint32), true));
       Expect(LexemeType::kBracket, L"]");
       GetNext();
       var_type = DeriveArrayFromType(var_type);
@@ -336,7 +370,7 @@ std::vector<std::pair<std::wstring, std::shared_ptr<TIDVariableType>>> Definitio
   if (IsLexeme(LexemeType::kOperator, L"=")) {
     GetNext();
     std::shared_ptr<TIDValue> expr_val = Expression();
-    Cast(expr_val->GetType(), var_type);
+    Cast(expr_val, var_type);
   }
   while (IsLexeme(LexemeType::kPunctuation, L",")) {
     GetNext();
@@ -345,7 +379,7 @@ std::vector<std::pair<std::wstring, std::shared_ptr<TIDVariableType>>> Definitio
     if (IsLexeme(LexemeType::kOperator, L"=")) {
       GetNext();
       auto expr_val = Expression();
-      Cast(expr_val->GetType(), var_type);
+      Cast(expr_val, var_type);
     }
   }
   Expect(LexemeType::kPunctuation, L";");
@@ -388,7 +422,7 @@ std::pair<std::vector<std::pair<std::wstring, std::shared_ptr<TIDVariableType>>>
       }
       GetNext();
       auto param_val = Expression();
-      Cast(param_val->GetType(), var.second);
+      Cast(param_val, var.second);
     } else {
       params.push_back(var);
     }
@@ -456,15 +490,17 @@ std::shared_ptr<TIDVariableType> Function(const std::wstring & name,
     Block(false);
     surrounding_loop_count = temp_value;
     scope_return_type.pop_back();
-    tid.RemoveScope();
+    // TODO
+    uint64_t stack_size = tid.GetFunctionScopeMaxAddress();
+    tid.RemoveFunctionScope();
   } else {
     GetNext();
-    PushNode(RPNOperatorNode(RPNOperatorType::kReturn));
+    PushNode(RPNOperator(RPNOperatorType::kReturn));
   }
   auto last = rpn.back()->GetNodes().back();
   if (last->GetNodeType() != NodeType::kOperator ||
-      std::dynamic_pointer_cast<RPNOperatorNode>(last)->GetOperatorType() != RPNOperatorType::kReturn)
-    PushNode(RPNOperatorNode(RPNOperatorType::kReturn));
+      std::dynamic_pointer_cast<RPNOperator>(last)->GetOperatorType() != RPNOperatorType::kReturn)
+    PushNode(RPNOperator(RPNOperatorType::kReturn));
   rpn.pop_back();
 
   debug("Exited Function");
@@ -532,7 +568,7 @@ void If() {
   std::shared_ptr<TIDValue> value = Expression();
   Expect(LexemeType::kParenthesis, L")");
   GetNext();
-  Cast(value->GetType(), SetConstToType(GetPrimitiveVariableType(PrimitiveVariableType::kBool), true));
+  Cast(value, SetConstToType(GetPrimitiveVariableType(PrimitiveVariableType::kBool), true));
   Block(true);
   Elif();
   if (IsLexeme(LexemeType::kReserved, L"else"))
@@ -545,7 +581,7 @@ void Elif() {
     Expect(LexemeType::kParenthesis, L"(");
     GetNext();
     std::shared_ptr<TIDValue> value = Expression();
-    Cast(value->GetType(), SetConstToType(GetPrimitiveVariableType(PrimitiveVariableType::kBool), true));
+    Cast(value, SetConstToType(GetPrimitiveVariableType(PrimitiveVariableType::kBool), true));
     Expect(LexemeType::kParenthesis, L")");
     GetNext();
     Block(true);
@@ -573,7 +609,7 @@ void For() {
   if (!IsLexeme(LexemeType::kPunctuation, L";"))
     val = Expression();
   if (val)
-    Cast(val->GetType(), GetPrimitiveVariableType(PrimitiveVariableType::kBool));
+    Cast(val, GetPrimitiveVariableType(PrimitiveVariableType::kBool));
   Expect(LexemeType::kPunctuation, L";");
   GetNext();
   if (!IsLexeme(LexemeType::kParenthesis, L")")) {
@@ -623,7 +659,7 @@ void While() {
   Expect(LexemeType::kParenthesis, L"(");
   GetNext();
   std::shared_ptr<TIDValue> val = Expression();
-  Cast(val->GetType(), SetConstToType(GetPrimitiveVariableType(PrimitiveVariableType::kBool), true));
+  Cast(val, SetConstToType(GetPrimitiveVariableType(PrimitiveVariableType::kBool), true));
   Expect(LexemeType::kParenthesis, L")");
   GetNext();
   ++surrounding_loop_count;
@@ -640,7 +676,7 @@ void DoWhile() {
   Expect(LexemeType::kReserved, L"while");
   GetNext();
   std::shared_ptr<TIDValue> value = Expression();
-  Cast(value->GetType(), SetConstToType(GetPrimitiveVariableType(PrimitiveVariableType::kBool), true));
+  Cast(value, SetConstToType(GetPrimitiveVariableType(PrimitiveVariableType::kBool), true));
   Expect(LexemeType::kParenthesis, L")");
   GetNext();
   Expect(LexemeType::kPunctuation, L";");
@@ -701,7 +737,7 @@ void Return() {
   if (!IsLexeme(LexemeType::kPunctuation, L";"))
     value = Expression();
   Expect(LexemeType::kPunctuation, L";");
-  Cast(value->GetType(), scope_return_type.back());
+  Cast(value, scope_return_type.back());
   GetNext();
 }
 
@@ -713,20 +749,19 @@ std::shared_ptr<TIDValue> New() {
     throw NewIncorrectUsage(lexeme, type);
   if (IsLexeme(LexemeType::kParenthesis, L")")) {
     GetNext();
-    PushNode(RPNOperandNode(type->GetSize()));
-    PushNode(RPNOperatorNode(RPNOperatorType::kNew));
+    PushNode(RPNOperand(type->GetSize()));
+    PushNode(RPNOperator(RPNOperatorType::kNew));
     return std::make_shared<TIDTemporaryValue>(SetConstToType(DerivePointerFromType(type), true));
   } else {
     Expect(LexemeType::kPunctuation, L",");
     GetNext();
     std::shared_ptr<TIDValue> ind = Expression();
-    // TODO: actually cast ind to uint32
-    Cast(ind->GetType(), SetConstToType(GetPrimitiveVariableType(PrimitiveVariableType::kUint32), true));
-    PushNode(RPNOperandNode(type->GetSize()));
-    PushNode(RPNOperatorNode(RPNOperatorType::kMultiply));
-    PushNode(RPNOperandNode(4));
-    PushNode(RPNOperatorNode(RPNOperatorType::kAdd));
-    PushNode(RPNOperatorNode(RPNOperatorType::kNew));
+    Cast(ind, SetConstToType(GetPrimitiveVariableType(PrimitiveVariableType::kUint32), true));
+    PushNode(RPNOperand(type->GetSize()));
+    PushNode(RPNOperator(RPNOperatorType::kMultiply));
+    PushNode(RPNOperand(4));
+    PushNode(RPNOperator(RPNOperatorType::kAdd));
+    PushNode(RPNOperator(RPNOperatorType::kNew));
     return std::make_shared<TIDTemporaryValue>(SetConstToType(DeriveArrayFromType(type), true));
   }
 }
@@ -741,14 +776,18 @@ std::shared_ptr<TIDValue> Delete() {
   if (var_type != VariableType::kPointer && var_type != VariableType::kArray)
     throw DeleteIncorrectUsage(lexeme, val->GetType());
   GetNext();
-  PushNode(RPNOperandNode(type->GetSize()));
-  if (var_type == VariableType::kArray) {
-    PushNode(RPNOperandNode(type->GetSize()));
-    PushNode(RPNOperatorNode(RPNOperatorType::kMultiply));
-    PushNode(RPNOperandNode(4));
-    PushNode(RPNOperatorNode(RPNOperatorType::kAdd));
+  LoadIfReference(val, *rpn.back());
+  if (var_type == VariableType::kPointer) {
+    PushNode(RPNOperand(type->GetSize()));
+  } else {
+    PushNode(RPNOperator(RPNOperatorType::kDuplicate));
+    PushNode(RPNOperator(RPNOperatorType::kLoad, PrimitiveVariableType::kUint32));
+    PushNode(RPNOperand(type->GetSize()));
+    PushNode(RPNOperator(RPNOperatorType::kMultiply));
+    PushNode(RPNOperand(4));
+    PushNode(RPNOperator(RPNOperatorType::kAdd));
   }
-  PushNode(RPNOperatorNode(RPNOperatorType::kDelete));
+  PushNode(RPNOperator(RPNOperatorType::kDelete));
   return std::make_shared<TIDTemporaryValue>(nullptr);
 }
 
@@ -761,6 +800,9 @@ std::shared_ptr<TIDValue> Size() {
   if (type->GetType() != VariableType::kArray)
     throw SizeIncorrectUsage(lexeme, val->GetType());
   GetNext();
+  LoadIfReference(val, *rpn.back());
+  PushNode(RPNOperator(RPNOperatorType::kLoad, PrimitiveVariableType::kUint64));
+  PushNode(RPNOperator(RPNOperatorType::kLoad, PrimitiveVariableType::kUint32));
   return std::make_shared<TIDTemporaryValue>(SetConstToType(GetPrimitiveVariableType(PrimitiveVariableType::kUint32), true));
 }
 
@@ -768,47 +810,81 @@ std::shared_ptr<TIDValue> Sizeof() {
   Expect(LexemeType::kParenthesis, L"(");
   GetNext();
   std::shared_ptr<TIDVariableType> type = Type(true);
+  if (!type)
+    throw VoidNotExpected(lexeme);
   Expect(LexemeType::kParenthesis, L")");
   GetNext();
+  PushNode(RPNOperand(type->GetSize()));
   return std::make_shared<TIDTemporaryValue>(SetConstToType(GetPrimitiveVariableType(PrimitiveVariableType::kUint32), true));
 }
 
-void FunctionCall(const std::shared_ptr<TIDVariableType> & type) {
+std::shared_ptr<TIDValue> Read() {
+  Expect(LexemeType::kParenthesis, L"(");
+  GetNext();
+  std::shared_ptr<TIDValue> val = Expression();
+  Expect(LexemeType::kParenthesis, L")");
+  auto type = val->GetType();
+  if (!type || type->IsConst() || (val->GetValueType() == TIDValueType::kTemporary && !type->IsReference())
+      || SetParamsToType(type, false, false) != DeriveArrayFromType(GetPrimitiveVariableType(PrimitiveVariableType::kChar)))
+    throw ReadIncorrectUsage(lexeme, type);
+  GetNext();
+  PushNode(RPNOperator(RPNOperatorType::kRead));
+  return std::make_shared<TIDTemporaryValue>(SetConstToType(GetPrimitiveVariableType(PrimitiveVariableType::kUint32), true));
+}
+
+std::shared_ptr<TIDValue> Write() {
+  Expect(LexemeType::kParenthesis, L"(");
+  GetNext();
+  std::shared_ptr<TIDValue> val = Expression();
+  Expect(LexemeType::kParenthesis, L")");
+  auto type = val->GetType();
+  if (!type || SetParamsToType(type, false, false) !=
+               DeriveArrayFromType(GetPrimitiveVariableType(PrimitiveVariableType::kChar)))
+    throw WriteIncorrectUsage(lexeme, type);
+  GetNext();
+  LoadIfReference(val, *rpn.back());
+  PushNode(RPNOperator(RPNOperatorType::kWrite));
+  return std::make_shared<TIDTemporaryValue>(SetConstToType(GetPrimitiveVariableType(PrimitiveVariableType::kUint32), true));
+}
+
+void FunctionCall(const std::shared_ptr<TIDValue> & val) {
   debug("Function Call");
+  auto type = val->GetType();
   if (type->GetType() != VariableType::kFunction)
     throw ExpectedFunction(type);
-  std::shared_ptr<TIDFunctionVariableType> func_type = std::static_pointer_cast<TIDFunctionVariableType>(type);
+  std::shared_ptr<TIDFunctionVariableType> func_type = std::dynamic_pointer_cast<TIDFunctionVariableType>(type);
   const std::vector<std::shared_ptr<TIDVariableType>> & params = func_type->GetParameters();
   const std::vector<std::shared_ptr<TIDVariableType>> & default_params = func_type->GetDefaultParameters();
 
   Expect(LexemeType::kParenthesis, L"(");
   GetNext();
-  std::vector<std::shared_ptr<TIDVariableType>> provided;
+  std::vector<std::shared_ptr<TIDValue>> provided;
   if (!IsLexeme(LexemeType::kParenthesis, L")")) {
     std::shared_ptr<TIDValue> value = Expression();
-    provided.push_back(value->GetType());
+    provided.push_back(value);
     while (IsLexeme(LexemeType::kPunctuation, L",")) {
       GetNext();
       value = Expression();
-      provided.push_back(value->GetType());
+      provided.push_back(value);
     }
   }
   Expect(LexemeType::kParenthesis, L")");
   GetNext();
 
   size_t param_index = 0, default_param_index = 0;
-  for (const std::shared_ptr<TIDVariableType> & provided_type : provided) {
+  for (const std::shared_ptr<TIDValue> & provided_val : provided) {
     if (param_index == params.size()) {
-      if (default_param_index == default_params.size() || !CanCast(
-          SetConstToType(provided_type, false), default_params[default_param_index++]))
+      if (default_param_index == default_params.size() || !CanCast(provided_val, default_params[default_param_index++]))
         throw FunctionParameterListDoesNotMatch(lexeme, func_type, provided);
     } else {
-      if (!CanCast(SetConstToType(provided_type, false), params[param_index++]))
+      if (!CanCast(provided_val, params[param_index++]))
         throw FunctionParameterListDoesNotMatch(lexeme, func_type, provided);
     }
   }
   if (param_index < params.size())
     throw FunctionParameterListDoesNotMatch(lexeme, func_type, provided);
+
+  // TODO: RPN function call
 }
 
 const size_t signs1_sz = /*12*/ 11; // no power (**) 'cause it messes with pointers
@@ -1020,35 +1096,24 @@ std::shared_ptr<TIDValue> Priority13() {
         throw TypeNotIndexed(lexeme);
       GetNext();
       auto index_val = Expression();
-      Cast(index_val->GetType(), SetConstToType(GetPrimitiveVariableType(PrimitiveVariableType::kUint32), true));
+      Cast(index_val, SetConstToType(GetPrimitiveVariableType(PrimitiveVariableType::kUint32), true));
       Expect(LexemeType::kBracket, L"]");
       GetNext();
       type = SetReferenceToType(std::static_pointer_cast<TIDArrayVariableType>(type)->GetValue(), true);
       val = std::make_shared<TIDTemporaryValue>(type);
-      PushNode(RPNOperandNode(type->GetSize()));
-      PushNode(RPNOperatorNode(RPNOperatorType::kMultiply, PrimitiveVariableType::kUint64));
-      PushNode(RPNOperandNode(4));
-      PushNode(RPNOperatorNode(RPNOperatorType::kAdd, PrimitiveVariableType::kUint64));
-      PushNode(RPNOperatorNode(RPNOperatorType::kAdd, PrimitiveVariableType::kUint64));
-      LoadType(type);
+      PushNode(RPNOperand(type->GetSize()));
+      PushNode(RPNOperator(RPNOperatorType::kMultiply, PrimitiveVariableType::kUint64));
+      PushNode(RPNOperand(4));
+      PushNode(RPNOperator(RPNOperatorType::kAdd, PrimitiveVariableType::kUint64));
+      PushNode(RPNOperator(RPNOperatorType::kAdd, PrimitiveVariableType::kUint64));
     } else if (IsLexeme(LexemeType::kParenthesis, L"(")) {
       if (!type || type->GetType() != VariableType::kFunction)
         throw TypeNotCallable(lexeme);
       std::wstring name;
       if (val->GetValueType() == TIDValueType::kVariable)
         name = std::static_pointer_cast<TIDVariable>(val)->GetName();
-      if (name == L"new") {
-        val = New();
-      } else if (name == L"delete") {
-        val = Delete();
-      } else if (name == L"size") {
-        val = Size();
-      } else if (name == L"sizeof") {
-        val = Sizeof();
-      } else {
-        FunctionCall(type);
-        val = std::make_shared<TIDTemporaryValue>(std::static_pointer_cast<TIDFunctionVariableType>(type)->GetReturnType());
-      }
+      FunctionCall(val);
+      val = std::make_shared<TIDTemporaryValue>(std::static_pointer_cast<TIDFunctionVariableType>(type)->GetReturnType());
       type = val->GetType();
     } else if (IsLexeme(LexemeType::kOperator, L".")) {
       if (!type || type->GetType() != VariableType::kComplex)
@@ -1064,9 +1129,8 @@ std::shared_ptr<TIDValue> Priority13() {
       GetNext();
       type = SetParamsToType(new_type, type->IsConst(), true);
       val = std::make_shared<TIDTemporaryValue>(type);
-      PushNode(RPNOperandNode(offset));
-      PushNode(RPNOperatorNode(RPNOperatorType::kAdd));
-      LoadType(type);
+      PushNode(RPNOperand(offset));
+      PushNode(RPNOperator(RPNOperatorType::kAdd));
     } else if (IsLexeme(LexemeType::kOperator, L"++") || IsLexeme(LexemeType::kOperator, L"--")) {
       UnaryPostfixOperator op = IsLexeme(LexemeType::kOperator, L"++") ? UnaryPostfixOperator::kIncrement
         : UnaryPostfixOperator::kDecrement;
@@ -1076,7 +1140,7 @@ std::shared_ptr<TIDValue> Priority13() {
     } else if (IsLexeme(LexemeType::kReserved, L"as")) {
       GetNext();
       std::shared_ptr<TIDVariableType> new_type = Type(true);
-      Cast(type, new_type, true);
+      Cast(val, new_type, true);
       type = new_type;
       val = std::make_shared<TIDTemporaryValue>(type);
     } else
@@ -1094,14 +1158,23 @@ std::shared_ptr<TIDValue> Priority14() {
     return type;
   } else {
     std::shared_ptr<TIDValue> val;
-    if (IsLexeme(LexemeType::kNumericLiteral)) {
+    if (IsLexeme(LexemeType::kReserved, L"new") || IsLexeme(LexemeType::kReserved, L"delete") ||
+        IsLexeme(LexemeType::kReserved, L"size") || IsLexeme(LexemeType::kReserved, L"sizeof") ||
+        IsLexeme(LexemeType::kReserved, L"read") || IsLexeme(LexemeType::kReserved, L"write")) {
+      if (IsLexeme(LexemeType::kReserved, L"new")) val = New();
+      else if (IsLexeme(LexemeType::kReserved, L"delete")) val = Delete();
+      else if (IsLexeme(LexemeType::kReserved, L"size")) val = Size();
+      else if (IsLexeme(LexemeType::kReserved, L"sizeof")) val = Sizeof();
+      else if (IsLexeme(LexemeType::kReserved, L"read")) val = Read();
+      else val = Write();
+    } else if (IsLexeme(LexemeType::kNumericLiteral)) {
       PrimitiveVariableType primitive_type = NumericTypeFromString(lexeme.GetValue());
       val = std::make_shared<TIDTemporaryValue>(SetConstToType(
           GetPrimitiveVariableType(primitive_type), true));
       uint64_t value = (primitive_type == PrimitiveVariableType::kF32 ||
         primitive_type == PrimitiveVariableType::kF64) ? DecimalFromString(lexeme.GetValue(), primitive_type)
                                                        : IntegerFromString(lexeme.GetValue(), primitive_type);
-        PushNode(RPNOperandNode(value));
+        PushNode(RPNOperand(value));
     } else if (IsLexeme(LexemeType::kIdentifier)) {
       std::shared_ptr<TIDVariableType> struct_type = tid.GetComplexStruct(lexeme.GetValue());
       if (struct_type) {
@@ -1110,34 +1183,41 @@ std::shared_ptr<TIDValue> Priority14() {
         Expect(LexemeType::kParenthesis, L")");
         GetNext();
         val = std::make_shared<TIDTemporaryValue>(SetParamsToType(struct_type, true, false));
-        uint64_t address = tid.AddTemporaryStructInstance(lexeme, val->GetType());
-        PushNode(RPNOperandNode(address));
-        PushNode(RPNOperatorNode(RPNOperatorType::kFromSP));
+        uint64_t address = tid.AddTemporaryInstance(lexeme, val->GetType());
+        PushNode(RPNOperand(address));
+        PushNode(RPNOperator(RPNOperatorType::kFromSP));
       } else {
         val = tid.GetVariable(lexeme.GetValue());
         if (!val)
           throw UndeclaredIdentifier(lexeme);
         auto type = val->GetType();
-        PushNode(RPNOperandNode(std::dynamic_pointer_cast<TIDVariable>(val)->GetAddress()));
-        PushNode(RPNOperatorNode(RPNOperatorType::kFromSP));
-        LoadType(type);
+        PushNode(RPNOperand(std::dynamic_pointer_cast<TIDVariable>(val)->GetAddress()));
+        PushNode(RPNOperator(RPNOperatorType::kFromSP));
       }
     } else if (IsLexeme(LexemeType::kStringLiteral)) {
-      val = std::make_shared<TIDTemporaryValue>(
-          SetConstToType(DeriveArrayFromType(GetPrimitiveVariableType(PrimitiveVariableType::kChar)), true)
-      );
-      PushNode(RPNOperandNode(lexeme.GetValue().size() + 4));
-      PushNode(RPNOperatorNode(RPNOperatorType::kNew));
+      auto char_arr = SetConstToType(DeriveArrayFromType(
+            GetPrimitiveVariableType(PrimitiveVariableType::kChar)), true);
+      val = std::make_shared<TIDTemporaryValue>(char_arr);
+      PushNode(RPNOperand(lexeme.GetValue().size() + 4));
+      PushNode(RPNOperator(RPNOperatorType::kNew));
+      auto address = tid.AddTemporaryInstance(lexeme, char_arr);
+      PushNode(RPNOperand(address));
+      PushNode(RPNOperator(RPNOperatorType::kFromSP));
+      PushNode(RPNOperator(RPNOperatorType::kStore, PrimitiveVariableType::kUint64));
+
+      PushNode(RPNOperand(address));
+      PushNode(RPNOperator(RPNOperatorType::kFromSP));
+      PushNode(RPNOperator(RPNOperatorType::kLoad, PrimitiveVariableType::kUint64));
     } else if (IsLexeme(LexemeType::kCharLiteral)) {
       val = std::make_shared<TIDTemporaryValue>(
           SetConstToType(GetPrimitiveVariableType(PrimitiveVariableType::kChar), true)
       );
-      PushNode(RPNOperandNode(static_cast<unsigned char>(lexeme.GetValue()[0])));
+      PushNode(RPNOperand(static_cast<unsigned char>(lexeme.GetValue()[0])));
     } else if (IsLexeme(LexemeType::kReserved, L"true") || IsLexeme(LexemeType::kReserved, L"false")) {
       val = std::make_shared<TIDTemporaryValue>(
           SetConstToType(GetPrimitiveVariableType(PrimitiveVariableType::kBool), true)
       );
-      PushNode(RPNOperandNode(IsLexeme(LexemeType::kReserved, L"true")));
+      PushNode(RPNOperand(IsLexeme(LexemeType::kReserved, L"true")));
     }
     if (!val)
       throw ExpectedExpression(lexeme);

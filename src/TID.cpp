@@ -240,6 +240,7 @@ void TID::AddFunctionScope(const std::shared_ptr<TIDVariableType> & return_type)
   nodes_.emplace_back();
   uint32_t size_for_return = return_type ? return_type->GetSize() + 1 : 0;
   nodes_.back().next_address_ = size_for_return + 8 /* first 8 bytes are pointer for where to return after function is complete */;
+  max_address_.push_back(nodes_.back().next_address_);
 }
 
 void TID::RemoveScope() {
@@ -248,6 +249,12 @@ void TID::RemoveScope() {
   nodes_.pop_back();
   nodes_.back().child_node_cnt_++;
 }
+
+void TID::RemoveFunctionScope() {
+  RemoveScope();
+  max_address_.pop_back();
+}
+
 void TID::AddComplexStruct(const Lexeme & lexeme, const std::shared_ptr<TIDVariableType> & complex_struct) {
   if (!complex_struct || complex_struct->GetType() != VariableType::kComplex)
     throw NotComplexStructError();
@@ -266,16 +273,18 @@ void TID::AddVariable(const Lexeme & lexeme, const std::wstring & name,
   std::shared_ptr<TIDVariable> var = std::make_shared<TIDVariable>(name, GetCurrentPrefix(), type,
       nodes_.back().next_address_);
   nodes_.back().next_address_ += type->GetSize();
+  max_address_.back() = std::max(max_address_.back(), nodes_.back().next_address_);
   nodes_.back().variables_[name] = var;
 }
-uint64_t TID::AddTemporaryStructInstance([[maybe_unused]] const Lexeme & lexeme,
+uint64_t TID::AddTemporaryInstance([[maybe_unused]] const Lexeme & lexeme,
                                      const std::shared_ptr<TIDVariableType> & type) {
-  if (!type || type->GetType() != VariableType::kComplex)
-    throw NotComplexStructError();
+  if (!type)
+    throw VoidNotExpected(lexeme);
   std::wstring name = L"$" + std::to_wstring(temp_structs++);
   std::shared_ptr<TIDVariable> var = std::make_shared<TIDVariable>(name, GetCurrentPrefix(), type,
       nodes_.back().next_address_);
   nodes_.back().next_address_ += type->GetSize();
+  max_address_.back() = std::max(max_address_.back(), nodes_.back().next_address_);
   return nodes_.back().next_address_ - type->GetSize();
 }
 

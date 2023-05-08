@@ -216,7 +216,11 @@ std::vector<std::shared_ptr<TIDValue>> GetDerivedTypes(const std::shared_ptr<TID
 
 class TID {
  public:
-  TID() { AddScope(); }
+  TID() {
+    AddFunctionScope(SetConstToType(
+        GetPrimitiveVariableType(PrimitiveVariableType::kInt32), true
+        ));
+  }
 
   // All of them will return nullptr in std::shared_ptr if complex struct/variable is not found
   std::shared_ptr<const TIDVariableType> GetComplexStruct(const std::wstring & name) const {
@@ -249,16 +253,19 @@ class TID {
     return std::const_pointer_cast<TIDVariable>(const_cast<const TID &>(*this).GetVariableFromCurrentScope(name));
   }
 
+  uint64_t GetFunctionScopeMaxAddress() const { return max_address_.back(); }
+
  public:
   void AddScope();
   void AddFunctionScope(const std::shared_ptr<TIDVariableType> & return_type);
   void RemoveScope();
+  void RemoveFunctionScope();
   void AddComplexStruct(const Lexeme & lexeme,
                         const std::shared_ptr<TIDVariableType> & complex_struct);
   void AddVariable(const Lexeme & lexeme, const std::wstring & name,
                    const std::shared_ptr<TIDVariableType> & type);
-  uint64_t AddTemporaryStructInstance(const Lexeme & lexeme,
-                                  const std::shared_ptr<TIDVariableType> & type);
+  uint64_t AddTemporaryInstance(const Lexeme & lexeme,
+                                const std::shared_ptr<TIDVariableType> & type);
 
  private:
   std::wstring GetCurrentPrefix() const;
@@ -274,4 +281,5 @@ class TID {
 
   uint32_t temp_structs = 0;
   std::vector<TIDNode> nodes_;
+  std::vector<uint64_t> max_address_;
 };

@@ -3,12 +3,16 @@
 #include <string>
 #include <fstream>
 
+#include "TID.hpp"
+#include "generation.hpp"
 #include "lexeme.hpp"
 #include "lexical_analyzer.hpp"
 #include "logging.hpp"
 #include "syntax_analyzer.hpp"
 #include "exceptions.hpp"
 #include "terminal_formatting.hpp"
+
+#include "run.hpp"
 
 std::map<std::string, std::string> options = {
     {"disableWarnings", "false"},
@@ -62,7 +66,27 @@ std::vector<std::string> split(std::string str, const std::string & delimiter) {
   return result;
 }
 
+#define RPN_EXECUTING_TESTING 0
+
 int32_t main(const int argc, const char *argv[]) {
+
+#if defined(RPN_EXECUTING_TESTING) && RPN_EXECUTING_TESTING
+  // TEMP, testing running;
+  {
+    RPN rpn;
+    rpn.PushNode(RPNOperand(13 + 8 + 4 + 4));
+    rpn.PushNode(RPNOperand(0));
+    rpn.PushNode(RPNOperator(RPNOperatorType::kPush));
+    rpn.PushNode(RPNOperand(-1ull));
+    rpn.PushNode(RPNOperator(RPNOperatorType::kSP));
+    rpn.PushNode(RPNOperator(RPNOperatorType::kStore, PrimitiveVariableType::kUint64));
+
+    Execute(rpn);
+
+    return 0;
+  }
+#endif
+
   if (argc < 2) {
     PrintHelp();
     return 0;

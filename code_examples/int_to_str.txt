@@ -1,0 +1,22 @@
+char[] ToString(int64 x) {
+  if (x == 0) return "0";
+  bool sign = x < 0;
+  if (x < 0) x = -x;
+  int64 y = x;
+  int32 len = 0;
+  while (y) {
+    y /= 10;
+    len++;
+  }
+  char res[len + sign];
+  if (sign) res[0] = '-';
+  int32 ind = len-1;
+  y = x;
+  while (y) {
+    res[ind--] = '0' + (y % 10);
+    y /= 10;
+  }
+  return res;
+}
+
+write(ToString(5));

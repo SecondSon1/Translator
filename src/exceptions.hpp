@@ -76,6 +76,15 @@ class UnableToCast : public std::exception {
   std::shared_ptr<TIDVariableType> type_;
 };
 
+class VariableNotFoundByInternalName : public std::exception {
+ public:
+  VariableNotFoundByInternalName() {}
+
+  const char* what() const noexcept override {
+    return "Variable not found by its internal name";
+  }
+};
+
 // =============================
 // === Now for user's errors ===
 // =============================
@@ -380,11 +389,11 @@ class FunctionParameterListDoesNotMatch : public SemanticsAnalysisError {
  public:
   FunctionParameterListDoesNotMatch(const Lexeme & lexeme,
       const std::shared_ptr<TIDFunctionVariableType> & function_type,
-      const std::vector<std::shared_ptr<TIDVariableType>> & provided)
+      const std::vector<std::shared_ptr<TIDValue>> & provided)
     : SemanticsAnalysisError(lexeme), function_type_(function_type), provided_(provided) {}
 
   std::shared_ptr<TIDFunctionVariableType> GetFunctionType() const { return function_type_; }
-  std::vector<std::shared_ptr<TIDVariableType>> GetProvided() const { return provided_; }
+  std::vector<std::shared_ptr<TIDValue>> GetProvided() const { return provided_; }
 
   const char* what() const noexcept override {
     return "Calling a function with incorrect parameter list";
@@ -392,7 +401,7 @@ class FunctionParameterListDoesNotMatch : public SemanticsAnalysisError {
 
  private:
   std::shared_ptr<TIDFunctionVariableType> function_type_;
-  std::vector<std::shared_ptr<TIDVariableType>> provided_;
+  std::vector<std::shared_ptr<TIDValue>> provided_;
 };
 
 class NewIncorrectUsage : public SemanticsAnalysisError {
@@ -438,4 +447,119 @@ class SizeIncorrectUsage : public SemanticsAnalysisError {
 
  private:
   std::shared_ptr<TIDVariableType> got_;
+};
+
+class ReadIncorrectUsage : public SemanticsAnalysisError {
+ public:
+  ReadIncorrectUsage(const Lexeme & lexeme, const std::shared_ptr<TIDVariableType> & got)
+      : SemanticsAnalysisError(lexeme), got_(got) {}
+
+  std::shared_ptr<TIDVariableType> GetGotType() const { return got_; }
+
+  const char* what() const noexcept override {
+    return "Usage: read(x), where x is non-const variable/temporary reference to char[]";
+  }
+
+ private:
+  std::shared_ptr<TIDVariableType> got_;
+};
+
+class WriteIncorrectUsage : public SemanticsAnalysisError {
+ public:
+  WriteIncorrectUsage(const Lexeme & lexeme, const std::shared_ptr<TIDVariableType> & got)
+      : SemanticsAnalysisError(lexeme), got_(got) {}
+
+  std::shared_ptr<TIDVariableType> GetGotType() const { return got_; }
+
+  const char* what() const noexcept override {
+    return "Usage: write(x), where x is char[]";
+  }
+
+ private:
+  std::shared_ptr<TIDVariableType> got_;
+};
+
+// ======================
+// === Runtime errors ===
+// ======================
+
+class RuntimeError : public TranslatorError {
+ public:
+  RuntimeError() : TranslatorError(0) {}
+
+  const char* what() const noexcept override {
+    return "Runtime error";
+  }
+};
+
+class ReferenceOperandMetError : public RuntimeError {
+ public:
+  ReferenceOperandMetError() : RuntimeError() {}
+
+  const char* what() const noexcept override {
+    return "Met reference operand, it is supposed to be replaced";
+  }
+};
+
+class StackOverflowError : public RuntimeError {
+ public:
+  StackOverflowError() : RuntimeError() {}
+
+  const char* what() const noexcept override {
+    return "Stack overflow";
+  }
+};
+
+class HeapOverflowError : public RuntimeError {
+ public:
+  HeapOverflowError() : RuntimeError() {}
+
+  const char* what() const noexcept override {
+    return "Heap overflow";
+  }
+};
+
+class MemoryOutOfBoundsError : public RuntimeError {
+ public:
+  MemoryOutOfBoundsError() : RuntimeError() {}
+
+  const char* what() const noexcept override {
+    return "Trying to access memory out of bounds";
+  }
+};
+
+class MemoryNotAllocated : public RuntimeError {
+ public:
+  MemoryNotAllocated() : RuntimeError() {}
+
+  const char* what() const noexcept override {
+    return "Trying to access memory which is not allocated";
+  }
+};
+
+class JumpOutsideOfProgram : public RuntimeError {
+ public:
+  JumpOutsideOfProgram() : RuntimeError() {}
+
+  const char* what() const noexcept override {
+    return "Jmp/jz/call instruction called to jump outside of program";
+  }
+};
+
+class FunctionNotCalled : public RuntimeError {
+ public:
+  FunctionNotCalled() : RuntimeError() {}
+
+  const char* what() const noexcept override {
+    return "FuncSP called on function which had not been called";
+  }
+};
+
+class DivisionByZero : public RuntimeError {
+ public:
+  DivisionByZero() : RuntimeError() {}
+
+  const char* what() const noexcept override {
+    return "Division by zero";
+  }
 };

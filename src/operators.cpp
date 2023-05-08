@@ -43,8 +43,6 @@ void SetUpOperatorString() {
   Set(kTilda, "~");
   Set(kDereference, "*");
   Set(kAddressOf, "&");
-  Set(kNew, "new");
-  Set(kDelete, "delete");
 #undef current_operator
 #undef current_map
 
