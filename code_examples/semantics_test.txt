@@ -1,0 +1,14 @@
+
+uint8 a, some_useful_variable;
+some_useful_variable = -1;
+
+for (uint8 a = -1; a > 0; ++a) {
+}
+
+if (a == 0) {
+    write("hi");
+}
+else {
+    write("bye");
+}
+

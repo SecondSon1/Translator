@@ -2,5 +2,6 @@
 
 #include <vector>
 #include "lexeme.hpp"
+#include "generation.hpp"
 
-void PerformSyntaxAnalysis(const std::vector<Lexeme> & lexemes);
+RPN PerformSyntaxAnalysis(const std::vector<Lexeme> & lexemes);

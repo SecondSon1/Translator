@@ -1,4 +1,61 @@
-int32 a = 5ul;
-int32 *b = &a;
+0: 21
+1: 0
+2: kPush
+3: 18446744073709551615
+4: kSP
+5: kStoreDA
+6: 13
+7: kFromSP
+8: 8
+9: kFill
+10: 13
+11: kFromSP
+12: kRead
+13: 13
+14: kFromSP
+15: kLoad
+16: kLoad
+17: 2
+18: kSave
+19: kRestore
+20: kToInt64
+21: 4294967295
+22: kBitwiseAnd
+23: kMoreOrEqual
+24: 51
+25: kJz
+26: 13
+27: kFromSP
+28: kLoad
+29: 1
+30: kToInt64
+31: 4294967295
+32: kBitwiseAnd
+33: 1
+34: kMultiply
+35: 4
+36: kAdd
+37: kAdd
+38: 120
+39: kSave
+40: kDuplicate
+41: kDuplicate
+42: kLoad
+43: kRestore
+44: kSave
+45: kDump
+46: kRestore
+47: kStoreAD
+48: kDump
+49: 51
+50: kJmp
+51: 13
+52: kFromSP
+53: kLoad
+54: kWrite
+55: kReturn
 
-int64 x = *(b as int32*);
+int32 x;
+for (int32 y; y < 5; ++y)
+    x += y * y;
+return x;

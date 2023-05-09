@@ -5,7 +5,7 @@
 #include "TID.hpp"
 
 constexpr uint8_t kOperatorCount = 44;
-constexpr uint8_t kUnaryPrefixOperatorCount = 10;
+constexpr uint8_t kUnaryPrefixOperatorCount = 10; // yeah I deleted some, so what? :)
 constexpr uint8_t kUnaryPostfixOperatorCount = 2;
 constexpr uint8_t kBinaryOperatorCount = 32;
 
@@ -22,8 +22,6 @@ enum class UnaryPrefixOperator : uint8_t {
   kTilda                        = 5,
   kDereference                  = 6,
   kAddressOf                    = 7,
-  kNew                          = 8,
-  kDelete                       = 9,
   kUnknown                      = 253
 };
 

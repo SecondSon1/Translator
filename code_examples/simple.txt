@@ -1,0 +1,7 @@
+write("bebralang\n");
+
+char s[];
+read(s);
+if (size(s) >= 2)
+  s[1] = 'x';
+write(s);

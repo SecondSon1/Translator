@@ -1,6 +1,7 @@
 #include "operations.hpp"
 
 #include "TID.hpp"
+#include "generation.hpp"
 #include "operators.hpp"
 #include "exceptions.hpp"
 #include "casts.hpp"
@@ -47,10 +48,10 @@ void SetUpUnaryOperations() {
       unary_operations[static_cast<uint8_t>(UnaryPrefixOperator::kIncrement)][{ TIDValueType::kTemporary, ref_type }] = ref_type;
       unary_operations[static_cast<uint8_t>(UnaryPrefixOperator::kDecrement)][{ TIDValueType::kVariable, type }] = ref_type;
       unary_operations[static_cast<uint8_t>(UnaryPrefixOperator::kDecrement)][{ TIDValueType::kTemporary, ref_type }] = ref_type;
-      unary_operations[static_cast<uint8_t>(UnaryPostfixOperator::kIncrement)][{ TIDValueType::kVariable, type }] = ref_type;
-      unary_operations[static_cast<uint8_t>(UnaryPostfixOperator::kIncrement)][{ TIDValueType::kTemporary, ref_type }] = ref_type;
-      unary_operations[static_cast<uint8_t>(UnaryPostfixOperator::kDecrement)][{ TIDValueType::kVariable, type }] = ref_type;
-      unary_operations[static_cast<uint8_t>(UnaryPostfixOperator::kDecrement)][{ TIDValueType::kTemporary, ref_type }] = ref_type;
+      unary_operations[static_cast<uint8_t>(UnaryPostfixOperator::kIncrement)][{ TIDValueType::kVariable, type }] = const_type;
+      unary_operations[static_cast<uint8_t>(UnaryPostfixOperator::kIncrement)][{ TIDValueType::kTemporary, ref_type }] = const_type;
+      unary_operations[static_cast<uint8_t>(UnaryPostfixOperator::kDecrement)][{ TIDValueType::kVariable, type }] = const_type;
+      unary_operations[static_cast<uint8_t>(UnaryPostfixOperator::kDecrement)][{ TIDValueType::kTemporary, ref_type }] = const_type;
 
       unary_operations[static_cast<uint8_t>(UnaryPrefixOperator::kInvert)][{ TIDValueType::kVariable, type }] = const_bool_type;
       unary_operations[static_cast<uint8_t>(UnaryPrefixOperator::kInvert)][{ TIDValueType::kTemporary, type }] = const_bool_type;
@@ -199,9 +200,8 @@ std::shared_ptr<TIDValue> UnaryPostfixOperation(const std::shared_ptr<TIDValue> 
   }
 }
 
-// TODO: check for assignment operations separately
-std::shared_ptr<TIDValue> BinaryOperation(const std::shared_ptr<TIDValue> & lhs,
-    BinaryOperator op, const std::shared_ptr<TIDValue> & rhs, const Lexeme & lexeme) {
+std::shared_ptr<TIDValue> BinaryOperationRPN(const std::shared_ptr<TIDValue> & lhs,
+    BinaryOperator op, const std::shared_ptr<TIDValue> & rhs, const Lexeme & lexeme, RPN & rpn) {
   if (!set_up_binary) SetUpBinaryOperations();
 
   auto lhs_type = lhs->GetType();
@@ -213,22 +213,65 @@ std::shared_ptr<TIDValue> BinaryOperation(const std::shared_ptr<TIDValue> & lhs,
     if (op == BinaryOperator::kAssignment) {
       auto lhs_type_clean = SetParamsToType(lhs_type, false, false);
       auto rhs_type_clean = SetParamsToType(rhs_type, false, false);
-      if (lhs_type_clean == rhs_type_clean && !lhs_type->IsConst() && (lhs->GetValueType() == TIDValueType::kVariable || lhs_type->IsReference()))
+      bool types_eq;
+      if (lhs_type->GetType() == VariableType::kPointer && rhs_type->GetType() == VariableType::kPointer)
+        types_eq = true;
+      else
+        types_eq = lhs_type_clean == rhs_type_clean;
+      if (types_eq && !lhs_type->IsConst() && IsReference(lhs)) {
+        rpn.PushNode(RPNOperator(RPNOperatorType::kSave));
+        rpn.PushNode(RPNOperator(RPNOperatorType::kDuplicate));
+        rpn.PushNode(RPNOperator(RPNOperatorType::kRestore));
+        if (lhs_type->GetType() == VariableType::kComplex) {
+          // complex is always an address
+          // FROM TO SIZE OP::COPY; from = rhs; to = lhs; size = sizeof(struct)
+          rpn.PushNode(RPNOperand(lhs_type->GetSize()));
+          rpn.PushNode(RPNOperator(RPNOperatorType::kCopyTF));
+        } else {
+          Cast(rhs, SetParamsToType(rhs_type, true, false), rpn);
+          rpn.PushNode(RPNOperator(RPNOperatorType::kStoreAD, GetTypeOfVariable(lhs_type)));
+        }
         return std::make_shared<TIDTemporaryValue>(SetParamsToType(lhs_type, false, true));
+      }
     }
     std::shared_ptr<TIDVariableType> int64_type = SetConstToType(GetPrimitiveVariableType(PrimitiveVariableType::kInt64), true);
     if (lhs_type->GetType() == rhs_type->GetType() && lhs_type->GetType() == VariableType::kPointer && op == BinaryOperator::kSubtraction) {
+      rpn.PushNode(RPNOperator(RPNOperatorType::kSave));
+      LoadIfReference(lhs, rpn);
+      rpn.PushNode(RPNOperator(RPNOperatorType::kRestore));
+      LoadIfReference(rhs, rpn);
+      rpn.PushNode(RPNOperator(RPNOperatorType::kSubtract, PrimitiveVariableType::kInt64));
       return std::make_shared<TIDTemporaryValue>(int64_type);
     } else if (op == BinaryOperator::kAddition || op == BinaryOperator::kAdditionAssignment) {
       if (op == BinaryOperator::kAdditionAssignment) {
-        if (lhs_type->GetType() == VariableType::kPointer && CanCast(rhs_type, int64_type)
-            && !lhs_type->IsConst() && (lhs_type->IsReference() || lhs->GetValueType() == TIDValueType::kVariable))
+        if (lhs_type->GetType() == VariableType::kPointer && CanCast(rhs, int64_type)
+            && !lhs_type->IsConst() && (lhs_type->IsReference() || lhs->GetValueType() == TIDValueType::kVariable)) {
+          rpn.PushNode(RPNOperator(RPNOperatorType::kSave));
+          rpn.PushNode(RPNOperator(RPNOperatorType::kDuplicate));
+          rpn.PushNode(RPNOperator(RPNOperatorType::kDuplicate));
+          LoadIfReference(lhs, rpn);
+          rpn.PushNode(RPNOperator(RPNOperatorType::kRestore));
+          Cast(rhs, int64_type, rpn);
+          rpn.PushNode(RPNOperator(RPNOperatorType::kAdd, PrimitiveVariableType::kUint64));
+          rpn.PushNode(RPNOperator(RPNOperatorType::kStoreAD, PrimitiveVariableType::kUint64));
           return std::make_shared<TIDTemporaryValue>(SetParamsToType(lhs_type, false, true));
+        }
       } else {
-        if (lhs_type->GetType() == VariableType::kPointer && CanCast(rhs_type, int64_type))
+        if (lhs_type->GetType() == VariableType::kPointer && CanCast(rhs, int64_type)) {
+          rpn.PushNode(RPNOperator(RPNOperatorType::kSave));
+          LoadIfReference(lhs, rpn);
+          rpn.PushNode(RPNOperator(RPNOperatorType::kRestore));
+          Cast(rhs, int64_type, rpn);
+          rpn.PushNode(RPNOperator(RPNOperatorType::kAdd, PrimitiveVariableType::kUint64));
           return std::make_shared<TIDTemporaryValue>(SetParamsToType(lhs_type, true, false));
-        else if (rhs_type->GetType() == VariableType::kPointer && CanCast(lhs_type, int64_type))
+        } else if (rhs_type->GetType() == VariableType::kPointer && CanCast(lhs, int64_type)) {
+          rpn.PushNode(RPNOperator(RPNOperatorType::kSave));
+          Cast(rhs, int64_type, rpn);
+          rpn.PushNode(RPNOperator(RPNOperatorType::kRestore));
+          LoadIfReference(lhs, rpn);
+          rpn.PushNode(RPNOperator(RPNOperatorType::kAdd, PrimitiveVariableType::kUint64));
           return std::make_shared<TIDTemporaryValue>(SetParamsToType(rhs_type, true, false));
+        }
       }
     }
     throw UnknownOperator(lexeme, op, lhs, rhs);
@@ -257,8 +300,58 @@ std::shared_ptr<TIDValue> BinaryOperation(const std::shared_ptr<TIDValue> & lhs,
         std::pair<VariableTypeWithValue, VariableTypeWithValue> args = {
           { d_lhs->GetValueType(), dt_lhs }, { d_rhs->GetValueType(), dt_rhs }
         };
-        if (binary_operations[op].count(args))
+        if (binary_operations[op].count(args)) {
+          // d_lhs is reference, d_rhs - dunno
+          rpn.PushNode(RPNOperator(RPNOperatorType::kSave));
+          rpn.PushNode(RPNOperator(RPNOperatorType::kDuplicate));
+          rpn.PushNode(RPNOperator(RPNOperatorType::kDuplicate));
+          LoadIfReference(d_lhs, rpn);
+          rpn.PushNode(RPNOperator(RPNOperatorType::kRestore));
+          Cast(rhs, dt_rhs, rpn);
+          LoadIfReference(dt_rhs, rpn);
+
+          switch (op) {
+            case BinaryOperator::kAssignment:
+              rpn.PushNode(RPNOperator(RPNOperatorType::kSave));
+              rpn.PushNode(RPNOperator(RPNOperatorType::kDump));
+              rpn.PushNode(RPNOperator(RPNOperatorType::kRestore));
+              break;
+            case BinaryOperator::kAdditionAssignment:
+              rpn.PushNode(RPNOperator(RPNOperatorType::kAdd, lhs_prim));
+              break;
+            case BinaryOperator::kSubtractionAssignment:
+              rpn.PushNode(RPNOperator(RPNOperatorType::kSubtract, lhs_prim));
+              break;
+            case BinaryOperator::kMultiplicationAssignment:
+              rpn.PushNode(RPNOperator(RPNOperatorType::kMultiply, lhs_prim));
+              break;
+            case BinaryOperator::kDivisionAssignment:
+              rpn.PushNode(RPNOperator(RPNOperatorType::kDivide, lhs_prim));
+              break;
+            case BinaryOperator::kModulusAssignment:
+              rpn.PushNode(RPNOperator(RPNOperatorType::kModulus, lhs_prim));
+              break;
+            case BinaryOperator::kBitwiseShiftLeftAssignment:
+              rpn.PushNode(RPNOperator(RPNOperatorType::kBitwiseShiftLeft, lhs_prim));
+              break;
+            case BinaryOperator::kBitwiseShiftRightAssignment:
+              rpn.PushNode(RPNOperator(RPNOperatorType::kBitwiseShiftRight, lhs_prim));
+              break;
+            case BinaryOperator::kBitwiseAndAssignment:
+              rpn.PushNode(RPNOperator(RPNOperatorType::kBitwiseAnd, lhs_prim));
+              break;
+            case BinaryOperator::kBitwiseOrAssignment:
+              rpn.PushNode(RPNOperator(RPNOperatorType::kBitwiseOr, lhs_prim));
+              break;
+            case BinaryOperator::kBitwiseXorAssignment:
+              rpn.PushNode(RPNOperator(RPNOperatorType::kBitwiseXor, lhs_prim));
+              break;
+            default: break;
+          }
+
+          rpn.PushNode(RPNOperator(RPNOperatorType::kStoreAD, lhs_prim));
           return std::make_shared<TIDTemporaryValue>(binary_operations[op][args]);
+        }
       }
     }
   } else {
@@ -274,11 +367,254 @@ std::shared_ptr<TIDValue> BinaryOperation(const std::shared_ptr<TIDValue> & lhs,
         std::pair<VariableTypeWithValue, VariableTypeWithValue> args = {
           { d_lhs->GetValueType(), dt_lhs }, { d_rhs->GetValueType(), dt_rhs }
         };
-        if (binary_operations[op].count(args))
+        lhs_prim = std::dynamic_pointer_cast<TIDPrimitiveVariableType>(dt_lhs)->GetPrimitiveType();
+        if (binary_operations[op].count(args)) {
+          rpn.PushNode(RPNOperator(RPNOperatorType::kSave));
+          Cast(lhs, dt_lhs, rpn);
+          LoadIfReference(dt_lhs, rpn);
+          rpn.PushNode(RPNOperator(RPNOperatorType::kRestore));
+          Cast(rhs, dt_rhs, rpn);
+          LoadIfReference(dt_rhs, rpn);
+
+          switch (op) {
+            case BinaryOperator::kAddition:
+              rpn.PushNode(RPNOperator(RPNOperatorType::kAdd, lhs_prim));
+              break;
+            case BinaryOperator::kSubtraction:
+              rpn.PushNode(RPNOperator(RPNOperatorType::kSubtract, lhs_prim));
+              break;
+            case BinaryOperator::kMultiplication:
+              rpn.PushNode(RPNOperator(RPNOperatorType::kMultiply, lhs_prim));
+              break;
+            case BinaryOperator::kDivision:
+              rpn.PushNode(RPNOperator(RPNOperatorType::kDivide, lhs_prim));
+              break;
+            case BinaryOperator::kModulus:
+              rpn.PushNode(RPNOperator(RPNOperatorType::kModulus, lhs_prim));
+              break;
+            case BinaryOperator::kBitwiseShiftLeft:
+              rpn.PushNode(RPNOperator(RPNOperatorType::kBitwiseShiftLeft, lhs_prim));
+              break;
+            case BinaryOperator::kBitwiseShiftRight:
+              rpn.PushNode(RPNOperator(RPNOperatorType::kBitwiseShiftRight, lhs_prim));
+              break;
+            case BinaryOperator::kBitwiseAnd:
+              rpn.PushNode(RPNOperator(RPNOperatorType::kBitwiseAnd, lhs_prim));
+              break;
+            case BinaryOperator::kBitwiseOr:
+              rpn.PushNode(RPNOperator(RPNOperatorType::kBitwiseOr, lhs_prim));
+              break;
+            case BinaryOperator::kBitwiseXor:
+              rpn.PushNode(RPNOperator(RPNOperatorType::kBitwiseXor, lhs_prim));
+              break;
+            case BinaryOperator::kEqual:
+              rpn.PushNode(RPNOperator(RPNOperatorType::kEqual, lhs_prim));
+              break;
+            case BinaryOperator::kNotEqual:
+              rpn.PushNode(RPNOperator(RPNOperatorType::kNotEqual, lhs_prim));
+              break;
+            case BinaryOperator::kLess:
+              rpn.PushNode(RPNOperator(RPNOperatorType::kLess, lhs_prim));
+              break;
+            case BinaryOperator::kMore:
+              rpn.PushNode(RPNOperator(RPNOperatorType::kMore, lhs_prim));
+              break;
+            case BinaryOperator::kLessOrEqual:
+              rpn.PushNode(RPNOperator(RPNOperatorType::kLessOrEqual, lhs_prim));
+              break;
+            case BinaryOperator::kMoreOrEqual:
+              rpn.PushNode(RPNOperator(RPNOperatorType::kMoreOrEqual, lhs_prim));
+              break;
+            case BinaryOperator::kLogicalAnd:
+              rpn.PushNode(RPNOperator(RPNOperatorType::kSave));
+              rpn.PushNode(RPNOperator(RPNOperatorType::kToBool, lhs_prim));
+              rpn.PushNode(RPNOperator(RPNOperatorType::kRestore));
+              rpn.PushNode(RPNOperator(RPNOperatorType::kToBool, lhs_prim));
+              rpn.PushNode(RPNOperator(RPNOperatorType::kBitwiseAnd, PrimitiveVariableType::kBool));
+              break;
+            case BinaryOperator::kLogicalOr:
+              rpn.PushNode(RPNOperator(RPNOperatorType::kSave));
+              rpn.PushNode(RPNOperator(RPNOperatorType::kToBool, lhs_prim));
+              rpn.PushNode(RPNOperator(RPNOperatorType::kRestore));
+              rpn.PushNode(RPNOperator(RPNOperatorType::kToBool, lhs_prim));
+              rpn.PushNode(RPNOperator(RPNOperatorType::kBitwiseOr, PrimitiveVariableType::kBool));
+              break;
+            default: break;
+          }
+
           return std::make_shared<TIDTemporaryValue>(binary_operations[op][args]);
+        }
       }
     }
   }
 
   throw UnknownOperator(lexeme, op, lhs, rhs);
 }
+std::shared_ptr<TIDValue> UnaryPrefixOperationRPN(UnaryPrefixOperator op,
+    const std::shared_ptr<TIDValue> & val, const Lexeme & lexeme, RPN & rpn) {
+  std::shared_ptr<TIDValue> result = UnaryPrefixOperation(op, val, lexeme);
+  PrimitiveVariableType primitive_type = GetTypeOfVariable(val->GetType());
+  switch (op) {
+    case UnaryPrefixOperator::kIncrement: // must be reference
+      rpn.PushNode(RPNOperator(RPNOperatorType::kDuplicate));
+      rpn.PushNode(RPNOperator(RPNOperatorType::kDuplicate));
+      rpn.PushNode(RPNOperator(RPNOperatorType::kLoad, primitive_type));
+      rpn.PushNode(RPNOperand(1));
+      rpn.PushNode(RPNOperator(RPNOperatorType::kAdd, primitive_type));
+      rpn.PushNode(RPNOperator(RPNOperatorType::kStoreAD, primitive_type));
+      break;
+    case UnaryPrefixOperator::kDecrement:
+      rpn.PushNode(RPNOperator(RPNOperatorType::kDuplicate));
+      rpn.PushNode(RPNOperator(RPNOperatorType::kDuplicate));
+      rpn.PushNode(RPNOperator(RPNOperatorType::kLoad, primitive_type));
+      rpn.PushNode(RPNOperand(1));
+      rpn.PushNode(RPNOperator(RPNOperatorType::kSubtract, primitive_type));
+      rpn.PushNode(RPNOperator(RPNOperatorType::kStoreAD, primitive_type));
+      break;
+    case UnaryPrefixOperator::kPlus:
+      // Nothing lol
+      break;
+    case UnaryPrefixOperator::kMinus:
+      LoadIfReference(val, rpn);
+      rpn.PushNode(RPNOperator(RPNOperatorType::kMinus, GetTypeOfVariable(val->GetType())));
+      break;
+    case UnaryPrefixOperator::kInvert:
+      LoadIfReference(val, rpn);
+      rpn.PushNode(RPNOperator(RPNOperatorType::kInvert, GetTypeOfVariable(val->GetType())));
+      break;
+    case UnaryPrefixOperator::kTilda:
+      LoadIfReference(val, rpn);
+      rpn.PushNode(RPNOperator(RPNOperatorType::kTilda, GetTypeOfVariable(val->GetType())));
+      break;
+    case UnaryPrefixOperator::kDereference:
+      assert(IsReference(val));
+      LoadIfReference(val, rpn);
+      break;
+    case UnaryPrefixOperator::kAddressOf:
+      assert(IsReference(val));
+      break;
+    case UnaryPrefixOperator::kUnknown:
+      throw UnknownOperator(lexeme, op, val);
+  }
+  return result;
+}
+std::shared_ptr<TIDValue> UnaryPostfixOperationRPN(const std::shared_ptr<TIDValue> & val,
+    UnaryPostfixOperator op, const Lexeme & lexeme, RPN & rpn) {
+  std::shared_ptr<TIDValue> result = UnaryPostfixOperation(val, op, lexeme);
+  PrimitiveVariableType primitive_type = GetTypeOfVariable(val->GetType());
+  switch (op) {
+    case UnaryPostfixOperator::kIncrement:
+      rpn.PushNode(RPNOperator(RPNOperatorType::kDuplicate));
+      rpn.PushNode(RPNOperator(RPNOperatorType::kDuplicate));
+      rpn.PushNode(RPNOperator(RPNOperatorType::kLoad, primitive_type));
+      rpn.PushNode(RPNOperand(1));
+      rpn.PushNode(RPNOperator(RPNOperatorType::kAdd, primitive_type));
+      rpn.PushNode(RPNOperator(RPNOperatorType::kStoreAD, primitive_type));
+
+      rpn.PushNode(RPNOperator(RPNOperatorType::kLoad, primitive_type));
+      rpn.PushNode(RPNOperand(1));
+      rpn.PushNode(RPNOperator(RPNOperatorType::kSubtract, primitive_type));
+      break;
+    case UnaryPostfixOperator::kDecrement:
+      rpn.PushNode(RPNOperator(RPNOperatorType::kDuplicate));
+      rpn.PushNode(RPNOperator(RPNOperatorType::kDuplicate));
+      rpn.PushNode(RPNOperator(RPNOperatorType::kLoad, primitive_type));
+      rpn.PushNode(RPNOperand(1));
+      rpn.PushNode(RPNOperator(RPNOperatorType::kSubtract, primitive_type));
+      rpn.PushNode(RPNOperator(RPNOperatorType::kStoreAD, primitive_type));
+
+      rpn.PushNode(RPNOperator(RPNOperatorType::kLoad, primitive_type));
+      rpn.PushNode(RPNOperand(1));
+      rpn.PushNode(RPNOperator(RPNOperatorType::kAdd, primitive_type));
+      break;
+    case UnaryPostfixOperator::kUnknown:
+      throw UnknownOperator(lexeme, op, val);
+  }
+  return result;
+}
+/*
+std::shared_ptr<TIDValue> BinaryOperationRPN(const std::shared_ptr<TIDValue> & lhs, BinaryOperator op,
+    const std::shared_ptr<TIDValue> & rhs, const Lexeme & lexeme, RPN & rpn) {
+  std::shared_ptr<TIDValue> result = BinaryOperation(lhs, op, rhs, lexeme);
+  PrimitiveVariableType lhs_primitive = GetTypeOfVariable(lhs->GetType());
+  PrimitiveVariableType rhs_primitive = GetTypeOfVariable(rhs->GetType());
+
+  switch (op) {
+    case BinaryOperator::kFunctionCall:
+    case BinaryOperator::kSubscript:
+    case BinaryOperator::kMemberAccess:
+      assert(false);
+      break;
+    case BinaryOperator::kMultiplication:
+      rpn.PushNode(RPNOperator(RPNOperatorType::kSave));
+      LoadIfReference(lhs, rpn);
+      rpn.PushNode(RPNOperator(RPNOperatorType::kRestore));
+      LoadIfReference(rhs, rpn);
+      rpn.PushNode(RPNOperator(RPNOperatorType::kMultiply));
+      break;
+    case BinaryOperator::kDivision:
+      rpn.PushNode(RPNOperator(RPNOperatorType::kSave));
+      LoadIfReference(lhs, rpn);
+      rpn.PushNode(RPNOperator(RPNOperatorType::kRestore));
+      LoadIfReference(rhs, rpn);
+      rpn.PushNode(RPNOperator(RPNOperatorType::kMultiply));
+      break;
+    case BinaryOperator::kModulus:
+      break;
+    case BinaryOperator::kAddition:
+      break;
+    case BinaryOperator::kSubtraction:
+      break;
+    case BinaryOperator::kBitwiseShiftLeft:
+      break;
+    case BinaryOperator::kBitwiseShiftRight:
+      break;
+    case BinaryOperator::kLess:
+      break;
+    case BinaryOperator::kMore:
+      break;
+    case BinaryOperator::kLessOrEqual:
+      break;
+    case BinaryOperator::kMoreOrEqual:
+      break;
+    case BinaryOperator::kEqual:
+      break;
+    case BinaryOperator::kNotEqual:
+      break;
+    case BinaryOperator::kBitwiseAnd:
+      break;
+    case BinaryOperator::kBitwiseXor:
+      break;
+    case BinaryOperator::kBitwiseOr:
+      break;
+    case BinaryOperator::kLogicalAnd:
+      break;
+    case BinaryOperator::kLogicalOr:
+      break;
+    case BinaryOperator::kAssignment:
+      break;
+    case BinaryOperator::kAdditionAssignment:
+      break;
+    case BinaryOperator::kSubtractionAssignment:
+      break;
+    case BinaryOperator::kMultiplicationAssignment:
+      break;
+    case BinaryOperator::kDivisionAssignment:
+      break;
+    case BinaryOperator::kModulusAssignment:
+      break;
+    case BinaryOperator::kBitwiseShiftLeftAssignment:
+      break;
+    case BinaryOperator::kBitwiseShiftRightAssignment:
+      break;
+    case BinaryOperator::kBitwiseAndAssignment:
+      break;
+    case BinaryOperator::kBitwiseOrAssignment:
+      break;
+    case BinaryOperator::kBitwiseXorAssignment:
+      break;
+    case BinaryOperator::kUnknown:
+      throw UnknownOperator(lexeme, op, lhs, rhs);
+  }
+  return result;
+}*/

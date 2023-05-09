@@ -23,7 +23,7 @@ void printUnexpectedLexeme(const TranslatorError &err) {
   if (error == nullptr) return;
 
   std::wcout << format::bright << " (" << format::reset;
-  std::wcout << format::bright << "expected: " << color::blue << ToString(error->GetExpected()) << format::reset;
+  std::wcout << format::bright << "expected: " << color::cyan << ToString(error->GetExpected()) << format::reset;
   std::wcout << format::bright << ", got: " << color::red << ToString(error->GetActual().GetType()) << format::reset;
   std::wcout << format::bright << ')' << format::reset;
 }
@@ -36,21 +36,53 @@ void printUnknownOperator(const TranslatorError &err) {
   switch (op.GetOperatorType()) {
     case OperatorType::kUnaryPrefix:
       std::wcout << format::bright << " (" << format::reset;
-      std::wcout << format::bright << color::blue << error->GetValue()->ToString() << format::reset;
+      if (error->GetValue()->GetValueType() == TIDValueType::kVariable) {
+        const TIDVariable var = dynamic_cast<const TIDVariable &>(*error->GetValue());
+        std::wcout << format::bright << color::blue << var.GetName() << " " << format::reset << format::bright << format::reset;
+        std::wcout << format::bright << color::red << var.GetType()->ToString() << format::reset;
+      }
+      else {
+        std::wcout << format::bright << color::blue << format::italic << "temp " << format::reset << format::bright << format::reset;
+        std::wcout << format::bright << color::red << error->GetValue()->GetType()->ToString() << format::reset;
+      }
       std::wcout << format::bright << " " << color::red << op.ToString() << format::reset;
       std::wcout << format::bright << ')' << format::reset;
       break;
     case OperatorType::kUnaryPostfix:
       std::wcout << format::bright << " (" << format::reset;
       std::wcout << format::bright << color::red << op.ToString() << " " << format::reset;
-      std::wcout << format::bright << color::blue << error->GetValue()->ToString() << format::reset;
+      if (error->GetValue()->GetValueType() == TIDValueType::kVariable) {
+        const TIDVariable var = dynamic_cast<const TIDVariable &>(*error->GetValue());
+        std::wcout << format::bright << color::blue << var.GetName() << " " << format::reset << format::bright << format::reset;
+        std::wcout << format::bright << color::red << var.GetType()->ToString() << format::reset;
+      }
+      else {
+        std::wcout << format::bright << color::blue << format::italic << "temp " << format::reset << format::bright << format::reset;
+        std::wcout << format::bright << color::red << error->GetValue()->GetType()->ToString() << format::reset;
+      }
       std::wcout << format::bright << ')' << format::reset;
       break;
     case OperatorType::kBinary:
       std::wcout << format::bright << " (" << format::reset;
-      std::wcout << format::bright << color::blue << error->GetLHSValue()->ToString() << format::reset;
+      if (error->GetLHSValue()->GetValueType() == TIDValueType::kVariable) {
+        const TIDVariable var = dynamic_cast<const TIDVariable &>(*error->GetLHSValue());
+        std::wcout << format::bright << color::blue << var.GetName() << " " << format::reset << format::bright << format::reset;
+        std::wcout << format::bright << color::red << var.GetType()->ToString() << format::reset;
+      }
+      else {
+        std::wcout << format::bright << color::blue << format::italic << "temp " << format::reset << format::bright << format::reset;
+        std::wcout << format::bright << color::red << error->GetLHSValue()->GetType()->ToString() << format::reset;
+      }
       std::wcout << format::bright << " " << color::red << op.ToString() << " " << format::reset;
-      std::wcout << format::bright << color::blue << error->GetRHSValue()->ToString() << format::reset;
+      if (error->GetRHSValue()->GetValueType() == TIDValueType::kVariable) {
+        const TIDVariable var = dynamic_cast<const TIDVariable &>(*error->GetRHSValue());
+        std::wcout << format::bright << color::blue << var.GetName() << " " << format::reset << format::bright << format::reset;
+        std::wcout << format::bright << color::red << var.GetType()->ToString() << format::reset;
+      }
+      else {
+        std::wcout << format::bright << color::blue << format::italic << "temp " << format::reset << format::bright << format::reset;
+        std::wcout << format::bright << color::red << error->GetRHSValue()->GetType()->ToString() << format::reset;
+      }
       std::wcout << format::bright << ')' << format::reset;
       break;
   };
@@ -61,7 +93,7 @@ void printTypeMismatch(const TranslatorError &err) {
   if (error == nullptr) return;
 
   std::wcout << format::bright << " (" << format::reset;
-  std::wcout << format::bright << "expected: " << color::blue << error->GetTypeExpected()->ToString() << format::reset;
+  std::wcout << format::bright << "expected: " << color::cyan << error->GetTypeExpected()->ToString() << format::reset;
   std::wcout << format::bright << ", got: " << color::red << error->GetTypeGot()->ToString() << format::reset;
   std::wcout << format::bright << ')' << format::reset;
 }
@@ -71,7 +103,7 @@ void printFunctionParameterListDoesNotMatch(const TranslatorError &err) {
   if (error == nullptr) return;
 
   std::wcout << format::bright << " (" << format::reset;
-  std::wcout << format::bright << "expected: " << color::blue;
+  std::wcout << format::bright << "expected: " << color::cyan;
   if (error->GetFunctionType()->GetParameters().size() == 0 && error->GetFunctionType()->GetDefaultParameters().size()) {
     std::wcout << "nothing";
   }
