@@ -9,13 +9,15 @@
 
 #undef assert
 
-void Assert(bool x, uint64_t pc) {
+void Assert(bool x, std::wstring x_expr, uint64_t pc) {
   if (!x) {
-    std::wcout << "Assertion failed: pc = " << pc << std::endl;
-    exit(0);
+    std::wcout << "Assertion failed: " << x_expr << std::endl;
+    std::wcout << "pc = " << pc << std::endl;
+
+    exit(1);
   }
 }
-#define assert(x) Assert(x, run::pc)
+#define assert(x) Assert(x, L"" #x, run::pc)
 
 namespace run {
   constexpr uint32_t

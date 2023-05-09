@@ -1,0 +1,7 @@
+struct S {
+  int32 x = 5;
+  int32 y = -10;
+}
+S a = S();
+a.x = -5;
+return a.x * a.y;

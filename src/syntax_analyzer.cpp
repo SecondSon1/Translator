@@ -318,10 +318,6 @@ void Struct() {
   for (std::shared_ptr<TIDVariable> var : tid.GetLastScopeVariables())
     result.emplace_back(var->GetName(), var->GetType());
   std::shared_ptr<TIDVariableType> complex_type = std::make_shared<TIDComplexVariableType>(name, result);
-  tid.AddComplexStruct(lexeme, complex_type);
-  auto complex_struct = tid.GetComplexStruct(name);
-  assert(complex_struct);
-  auto internal_name = std::dynamic_pointer_cast<TIDComplexVariableType>(complex_struct)->GetInternalName();
   PushNode(RPNOperand(size));
   PushNode(RPNOperator(RPNOperatorType::kNew));
   PushNode(RPNOperator(RPNOperatorType::kDuplicate));
@@ -330,6 +326,11 @@ void Struct() {
   PushNode(RPNOperand(size));
   PushNode(RPNOperator(RPNOperatorType::kCopyTF));
   tid.RemoveScope();
+  tid.AddComplexStruct(lexeme, complex_type);
+  auto complex_struct = tid.GetComplexStruct(name);
+  assert(complex_struct);
+  auto internal_name = std::dynamic_pointer_cast<TIDComplexVariableType>(complex_struct)->GetInternalName();
+
   // Add to tid pointer to that
   std::wstring def_var_name = internal_name + L"$def";
   tid.AddVariable(lexeme, def_var_name, SetParamsToType(DerivePointerFromType(complex_type), false, false));
@@ -1276,7 +1277,7 @@ std::shared_ptr<TIDValue> Priority13() {
       type = SetParamsToType(new_type, type->IsConst(), true);
       val = std::make_shared<TIDTemporaryValue>(type);
       PushNode(RPNOperand(offset));
-      PushNode(RPNOperator(RPNOperatorType::kAdd));
+      PushNode(RPNOperator(RPNOperatorType::kAdd, PrimitiveVariableType::kUint64));
     } else if (IsLexeme(LexemeType::kOperator, L"++") || IsLexeme(LexemeType::kOperator, L"--")) {
       UnaryPostfixOperator op = IsLexeme(LexemeType::kOperator, L"++") ? UnaryPostfixOperator::kIncrement
         : UnaryPostfixOperator::kDecrement;
@@ -1330,14 +1331,23 @@ std::shared_ptr<TIDValue> Priority14() {
       }
       std::shared_ptr<TIDVariableType> struct_type = tid.GetComplexStruct(lexeme.GetValue());
       if (struct_type) {
+        GetNext();
         Expect(LexemeType::kParenthesis, L"(");
         GetNext();
         Expect(LexemeType::kParenthesis, L")");
-        GetNext();
         val = std::make_shared<TIDTemporaryValue>(SetParamsToType(struct_type, true, false));
         uint64_t address = tid.AddTemporaryInstance(lexeme, val->GetType());
         PushNode(RPNOperand(address));
         PushNode(RPNOperator(RPNOperatorType::kFromSP));
+        PushNode(RPNOperator(RPNOperatorType::kDuplicate));
+        auto def_var = tid.GetVariable(
+            std::dynamic_pointer_cast<TIDComplexVariableType>(struct_type)->GetInternalName() + L"$def");
+        assert(def_var && def_var->GetType());
+        PushNode(RPNOperand(def_var->GetAddress()));
+        PushNode(RPNOperator(RPNOperatorType::kFromSP));
+        PushNode(RPNOperator(RPNOperatorType::kLoad, PrimitiveVariableType::kUint64));
+        PushNode(RPNOperand(struct_type->GetSize()));
+        PushNode(RPNOperator(RPNOperatorType::kCopyTF));
       } else {
         val = tid.GetVariable(lexeme.GetValue());
         if (!val)
