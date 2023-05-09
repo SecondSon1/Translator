@@ -240,7 +240,7 @@ void Cast(const std::shared_ptr<TIDValue> & from, const std::shared_ptr<TIDVaria
     rpn.PushNode(RPNOperator(RPNOperatorType::kFromF64, to_t));
   } else {
     rpn.PushNode(RPNOperator(RPNOperatorType::kToInt64, from_t));
-    rpn.PushNode(RPNOperand((1ull << GetSizeOfPrimitive(to_t)) - 1));
+    rpn.PushNode(RPNOperand((1ull << (GetSizeOfPrimitive(to_t) * 8)) - 1));
     rpn.PushNode(RPNOperator(RPNOperatorType::kBitwiseAnd, PrimitiveVariableType::kUint64));
   }
 }

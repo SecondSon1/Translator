@@ -2,4 +2,4 @@
 
 #include "generation.hpp"
 
-void Execute(const RPN & rpn);
+int32_t Execute(const RPN & rpn);

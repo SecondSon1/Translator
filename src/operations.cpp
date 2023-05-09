@@ -219,6 +219,9 @@ std::shared_ptr<TIDValue> BinaryOperationRPN(const std::shared_ptr<TIDValue> & l
       else
         types_eq = lhs_type_clean == rhs_type_clean;
       if (types_eq && !lhs_type->IsConst() && IsReference(lhs)) {
+        rpn.PushNode(RPNOperator(RPNOperatorType::kSave));
+        rpn.PushNode(RPNOperator(RPNOperatorType::kDuplicate));
+        rpn.PushNode(RPNOperator(RPNOperatorType::kRestore));
         if (lhs_type->GetType() == VariableType::kComplex) {
           // complex is always an address
           // FROM TO SIZE OP::COPY; from = rhs; to = lhs; size = sizeof(struct)
@@ -364,7 +367,7 @@ std::shared_ptr<TIDValue> BinaryOperationRPN(const std::shared_ptr<TIDValue> & l
         std::pair<VariableTypeWithValue, VariableTypeWithValue> args = {
           { d_lhs->GetValueType(), dt_lhs }, { d_rhs->GetValueType(), dt_rhs }
         };
-        lhs_prim = std::dynamic_pointer_cast<TIDPrimitiveVariableType>(d_lhs)->GetPrimitiveType();
+        lhs_prim = std::dynamic_pointer_cast<TIDPrimitiveVariableType>(dt_lhs)->GetPrimitiveType();
         if (binary_operations[op].count(args)) {
           rpn.PushNode(RPNOperator(RPNOperatorType::kSave));
           Cast(lhs, dt_lhs, rpn);

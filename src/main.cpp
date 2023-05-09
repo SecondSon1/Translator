@@ -135,8 +135,9 @@ int32_t main(const int argc, const char *argv[]) {
   size_t ind = 0;
   for (auto x : rpn.GetNodes())
     std::wcout << ind++ << L": " << x->ToString() << std::endl;
-
-  Execute(rpn);
+  std::wcout << std::endl << "Executing:" << std::endl;
+  int32_t ret_code = Execute(rpn);
+  std::wcout << L"Return code: " << std::to_wstring(ret_code) << std::endl;
 
   return 0;
 }

@@ -1,5 +1,7 @@
-int32 x;
-if (true)
-    x = 1;
-else
-    x = 2;
+write("bebralang\n");
+
+char s[];
+read(s);
+if (size(s) >= 2)
+  s[1] = 'x';
+write(s);

@@ -563,3 +563,12 @@ class DivisionByZero : public RuntimeError {
     return "Division by zero";
   }
 };
+
+class NullptrAccessedException : public RuntimeError {
+ public:
+  NullptrAccessedException() : RuntimeError() {}
+
+  const char* what() const noexcept override {
+    return "Accessed nullptr";
+  }
+};

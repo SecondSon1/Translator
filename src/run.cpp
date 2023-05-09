@@ -13,6 +13,7 @@ namespace run {
   STACK_SIZE = 1 * 1024 * 1024;
   constexpr uint32_t
   MAX_SIZE = 10 * 1024 * 1024;
+  constexpr uint64_t NULLPTR = -2ull;
 
 // if index < STACK_SIZE -> it is on stack
 // else, heap
@@ -130,6 +131,7 @@ namespace run {
   }
   void Load(uint8_t size) {
     uint64_t address = Pop();
+    if (address == NULLPTR) throw NullptrAccessedException();
     Push(ReadMemory(address, size));
   }
 
@@ -146,7 +148,7 @@ namespace run {
   void Jump(uint64_t address) {
     if (address >= program_size)
       throw JumpOutsideOfProgram();
-    pc = address;
+    pc = address - 1; // it will ++ in program
   }
 
   void Jmp() {
@@ -196,12 +198,15 @@ namespace run {
 
   void Read() {
     auto var_address = Pop(); // address of char[] variable
-    auto address = ReadMemory(var_address, 8); // address of start of char[]
     std::wstring line;
     std::getline(std::wcin, line);
     if (line.back() == L'\n') line.pop_back();
-    // Read reallocates string
-    DeleteMemory(address, ReadMemory(address, 4) + 4);
+
+    auto address = ReadMemory(var_address, 8); // address of start of char[]
+    if (address != NULLPTR) {
+      // Read reallocates string
+      DeleteMemory(address, ReadMemory(address, 4) + 4);
+    }
     auto new_address = NewMemory(line.size() + 4);
     WriteMemory(line.size(), new_address, 4);
     for (size_t i = 0; i < line.size(); ++i)
@@ -222,10 +227,10 @@ namespace run {
   void Return() {
     auto cur_sp = sp_stack.back().address;
     auto ret_ptr = ReadMemory(cur_sp, 8);
-    if (ret_ptr == -1ull) {
-      exit(0);
-    }
-    Jump(ret_ptr);
+    if (ret_ptr == -1ull)
+      pc = program_size;
+    else
+      Jump(ret_ptr);
   }
 
   void FuncSP() {
@@ -283,7 +288,8 @@ namespace run {
 
   uint64_t PruneNum(uint64_t data, PrimitiveVariableType type) {
     auto size = type == PrimitiveVariableType::kBool ? 1 : GetSizeOfPrimitive(type);
-    return data & ((1ull << size) - 1); // 1ull << 64 = 0; 0 - 1 = -1 = 2^64-1
+    if (size == 8) return data;
+    return data & ((1ull << (size * 8)) - 1); // 1ull << 64 = 0; 0 - 1 = -1 = 2^64-1
   }
 
   void ToF64(PrimitiveVariableType type) {
@@ -989,7 +995,7 @@ namespace run {
 
 }
 
-void Execute(const RPN & rpn_obj) {
+int32_t Execute(const RPN & rpn_obj) {
   run::AllocateChunk(0, run::STACK_SIZE);
   const std::vector<std::shared_ptr<RPNNode>> & rpn = rpn_obj.GetNodes();
   run::program_size = rpn.size();
@@ -1004,4 +1010,9 @@ void Execute(const RPN & rpn_obj) {
       run::HandleOperation(ptr->GetOperatorType(), ptr->GetVariableType());
     }
   }
+
+  int32_t return_code = 0;
+  if (run::memory[8])
+    return_code = run::ReadMemory(9, 4);
+  return return_code;
 }
