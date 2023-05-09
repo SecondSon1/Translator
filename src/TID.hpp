@@ -86,13 +86,21 @@ class TIDComplexVariableType : public TIDVariableType {
   const std::vector<std::pair<std::wstring, std::shared_ptr<TIDVariableType>>> & GetContents() const { return contents_; }
 
   std::wstring GetName() const { return name_; }
+  std::wstring GetInternalName() const { return internal_name_; }
   std::shared_ptr<TIDVariableType> GetField(std::wstring & name) const;
   uint32_t GetOffset(std::wstring & name) const;
 
   std::wstring ToString() const override;
 
  private:
+  friend class TID;
+  void SetInternalPrefix(const std::wstring & prefix) {
+    internal_name_ = prefix + name_;
+  }
+
+ private:
   std::wstring name_;
+  std::wstring internal_name_;
   std::vector<std::pair<std::wstring, std::shared_ptr<TIDVariableType>>> contents_;
 };
 
@@ -218,8 +226,8 @@ class TID {
  public:
   TID() {
     AddFunctionScope(SetConstToType(
-        GetPrimitiveVariableType(PrimitiveVariableType::kInt32), true
-        ));
+      GetPrimitiveVariableType(PrimitiveVariableType::kInt32), true
+    ));
   }
 
   // All of them will return nullptr in std::shared_ptr if complex struct/variable is not found
@@ -254,6 +262,15 @@ class TID {
   }
 
   uint64_t GetFunctionScopeMaxAddress() const { return max_address_.back(); }
+
+  std::vector<std::shared_ptr<TIDVariable>> GetLastScopeVariables() const {
+    std::vector<std::shared_ptr<TIDVariable>> res;
+    for (auto [name, var] : nodes_.back().variables_)
+      res.push_back(var);
+    return res;
+  }
+
+  uint64_t GetNextAddress() const { return nodes_.back().next_address_; }
 
  public:
   void AddScope();

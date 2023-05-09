@@ -4,16 +4,25 @@
 #include "generation.hpp"
 #include <map>
 #include <memory>
-#include <cassert>
 #include <string>
 #include <iostream>
+
+#undef assert
+
+void Assert(bool x, uint64_t pc) {
+  if (!x) {
+    std::wcout << "Assertion failed: pc = " << pc << std::endl;
+    exit(0);
+  }
+}
+#define assert(x) Assert(x, run::pc)
 
 namespace run {
   constexpr uint32_t
   STACK_SIZE = 1 * 1024 * 1024;
   constexpr uint32_t
   MAX_SIZE = 10 * 1024 * 1024;
-  constexpr uint64_t NULLPTR = -2ull;
+  constexpr uint64_t NULLPTR = 0;
 
 // if index < STACK_SIZE -> it is on stack
 // else, heap
@@ -81,7 +90,7 @@ namespace run {
   };
 
   std::vector<SPItem> sp_stack;
-  uint64_t sp = 0; // stack pointer
+  uint64_t sp = 1; // stack pointer
   uint64_t hp = STACK_SIZE; // heap pointer
   uint64_t pc = 0; // program counter
   uint64_t program_size;
@@ -997,6 +1006,7 @@ namespace run {
 
 int32_t Execute(const RPN & rpn_obj) {
   run::AllocateChunk(0, run::STACK_SIZE);
+  run::func_sps[0].push_back(0);
   const std::vector<std::shared_ptr<RPNNode>> & rpn = rpn_obj.GetNodes();
   run::program_size = rpn.size();
   for (run::pc = 0; run::pc < rpn.size(); ++run::pc) {
@@ -1012,7 +1022,7 @@ int32_t Execute(const RPN & rpn_obj) {
   }
 
   int32_t return_code = 0;
-  if (run::memory[8])
-    return_code = run::ReadMemory(9, 4);
+  if (run::memory[9])
+    return_code = static_cast<int32_t>(static_cast<uint32_t>(run::ReadMemory(10, 4)));
   return return_code;
 }

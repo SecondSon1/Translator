@@ -234,7 +234,7 @@ void Cast(const std::shared_ptr<TIDValue> & from, const std::shared_ptr<TIDVaria
   else if (to_t == PrimitiveVariableType::kBool)
     rpn.PushNode(RPNOperator(RPNOperatorType::kToBool, from_t));
   else if (to_t == PrimitiveVariableType::kInt64 || to_t == PrimitiveVariableType::kUint64)
-    rpn.PushNode(RPNOperator(RPNOperatorType::kToInt64));
+    rpn.PushNode(RPNOperator(RPNOperatorType::kToInt64, from_t));
   else if (to_t == PrimitiveVariableType::kF32 || from_t == PrimitiveVariableType::kF32) {
     rpn.PushNode(RPNOperator(RPNOperatorType::kToF64, from_t));
     rpn.PushNode(RPNOperator(RPNOperatorType::kFromF64, to_t));

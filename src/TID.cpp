@@ -79,15 +79,25 @@ uint32_t TIDComplexVariableType::GetOffset(std::wstring & name) const {
 }
 
 std::wstring TIDPrimitiveVariableType::ToString() const {
-  return ::ToString(type_);
+  std::wstring result;
+  if (IsConst()) result += L"const ";
+  result += ::ToString(type_);
+  if (IsReference()) result += L" &";
+  return result;
 }
 
 std::wstring TIDComplexVariableType::ToString() const {
-  return name_;
+  std::wstring result;
+  if (IsConst()) result += L"const ";
+  result += name_;
+  if (IsReference()) result += L" &";
+  return result;
 }
 
 std::wstring TIDFunctionVariableType::ToString() const {
-  std::wstring result = L"function<" + (return_type_ ? return_type_->ToString() : L"void") + L"(";
+  std::wstring result;
+  if (IsConst()) result += L"const ";
+  result += L"function<" + (return_type_ ? return_type_->ToString() : L"void") + L"(";
   bool was_first = false;
   if (!parameters_.empty()) {
     result += parameters_[0]->ToString();
@@ -102,18 +112,27 @@ std::wstring TIDFunctionVariableType::ToString() const {
       result += L", " + default_parameters_[i]->ToString() + L"=";
   }
   result += L")>";
+  if (IsReference()) result += L" &";
   return result;
 }
 
 std::wstring TIDPointerVariableType::ToString() const {
+  std::wstring result;
+  if (IsConst()) result += L"const ";
   if (value_->GetType() == VariableType::kArray)
-    return L"*(" + value_->ToString() + L")";
+    result += L"*(" + value_->ToString() + L")";
   else
-    return L"*" + value_->ToString();
+    result += L"*" + value_->ToString();
+  if (IsReference()) result += L" &";
+  return result;
 }
 
 std::wstring TIDArrayVariableType::ToString() const {
-  return value_->ToString() + L"[]";
+  std::wstring result;
+  if (IsConst()) result += L"const ";
+  result += value_->ToString() + L"[]";
+  if (IsReference()) result += L" &";
+  return result;
 }
 
 std::map<std::shared_ptr<TIDVariableType>, std::shared_ptr<TIDVariableType>> origin;
@@ -261,6 +280,8 @@ void TID::AddComplexStruct(const Lexeme & lexeme, const std::shared_ptr<TIDVaria
   std::wstring name = std::static_pointer_cast<TIDComplexVariableType>(complex_struct)->GetName();
   if (nodes_.back().complex_structs_.count(name) || nodes_.back().variables_.count(name))
     throw ConflictingNames(lexeme);
+  std::dynamic_pointer_cast<TIDComplexVariableType>(complex_struct)
+    ->SetInternalPrefix(GetCurrentPrefix());
   nodes_.back().complex_structs_[name] = complex_struct;
 }
 

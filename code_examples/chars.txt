@@ -1,6 +1,6 @@
 char x = ' ';
-char y[3] = "   ";
+char y[] = "   ";
 if (x == y[2]) {
-  return 1;
+  return 100;
 }
-return 0;
+return -69;
