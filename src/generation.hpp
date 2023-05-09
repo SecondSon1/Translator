@@ -5,7 +5,7 @@
 #include <memory>
 
 enum class NodeType : uint8_t {
-  kOperand, kOperator, kReferenceOperand
+  kOperand, kOperator, kReferenceOperand, kRelativeOperand
 };
 
 class RPNNode {
@@ -45,6 +45,17 @@ class RPNReferenceOperand : public RPNNode {
   std::wstring name_;
 };
 
+class RPNRelativeOperand : public RPNNode {
+ public:
+  RPNRelativeOperand(uint64_t value) : RPNNode(NodeType::kRelativeOperand), value_(value) {}
+
+  uint64_t GetValue() const { return value_; }
+  std::wstring ToString() const override { return std::to_wstring(value_); }
+
+ private:
+  uint64_t value_;
+};
+
 // Item on stack:
 // First 8 bytes - return pointer - when meeting "return" moves there. -1 if global
 // Then space for return value (sizeof(return value) + 1), 1 first byte is 0 if anything was returned, else 1
@@ -55,7 +66,8 @@ class RPNReferenceOperand : public RPNNode {
 enum class RPNOperatorType : uint8_t {
   // Internal Operators
   kLoad,      // Unary; Load data from $arg, size specified in value of size Size(type_); pushes value loaded to RPN
-  kStore,     // Binary: Store data $arg1 to $arg2, size specified in value of size Size(type_);
+  kStoreDA,   // Binary: Store data $arg1 to $arg2, size specified in value of size Size(type_);
+  kStoreAD,   // Binary: Store data $arg2 to $arg1, size specified in value of size Size(type_);
   kJmp,       // Unary: Jumps to $arg
   kCall,      // Unary: Same as jmp, but used to call function. Difference is that when run, $arg will be
               //        recorded as a function address to be used with kFuncSP
@@ -73,6 +85,12 @@ enum class RPNOperatorType : uint8_t {
   kFuncSP,    // Unary; pushes (function that was called by jmp $arg)'s latest SP to RPN
   kDump,      // Unary; does nothing (takes $arg and disappears)
   kDuplicate, // Unary; does not consume argument, pushes its copy
+  kSave,      // Unary; saves element pulled from stack in buffer
+  kRestore,   // No args; pushes saved element in buffer; buffer is not cleared after;
+              // by default is equal to 0
+  kCopyFT,    // 3 args; copies from $arg1 into $arg2 chunk of size $arg3
+  kCopyTF,    // 3 args; copies from $arg2 into $arg1 chunk of size $arg3
+  kFill,      // Binary; fills chunk from $arg1 of size $arg2 with 0
 
   // Casting operators
   kToF64,   // Unary; pushes value casted from {type_} (int) to f64 to RPN
@@ -135,6 +153,9 @@ class RPN {
   void PushNode(const RPNReferenceOperand & operand) {
     nodes_.push_back(std::make_shared<RPNReferenceOperand>(operand));
   }
+  void PushNode(const RPNRelativeOperand & operand) {
+    nodes_.push_back(std::make_shared<RPNRelativeOperand>(operand));
+  }
   void PushNode(const RPNOperator & op) {
     nodes_.push_back(std::make_shared<RPNOperator>(op));
   }
@@ -148,6 +169,10 @@ class RPN {
 
 PrimitiveVariableType GetTypeOfVariable(const std::shared_ptr<TIDVariableType> & type);
 
+bool IsReference(const std::shared_ptr<TIDValue> & value);
+bool IsReference(const std::shared_ptr<TIDVariableType> & type);
+
 void AddReturn(RPN & rpn);
 void LoadIfReference(const std::shared_ptr<TIDValue> & val, RPN & rpn);
+void LoadIfReference(const std::shared_ptr<TIDVariableType> & val, RPN & rpn);
 void LoadPointer(std::shared_ptr<TIDValue> & ptr, RPN & rpn);

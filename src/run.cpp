@@ -105,6 +105,7 @@ namespace run {
     hp += size;
     return ptr;
   }
+
   void DeleteMemory(uint64_t address, uint64_t size) {
     assert(IsChunkAllocated(address, address + size));
     if (address < STACK_SIZE) assert(false); // trying to delete memory on stack
@@ -132,8 +133,13 @@ namespace run {
     Push(ReadMemory(address, size));
   }
 
-  void Store(uint8_t size) {
+  void StoreDA(uint8_t size) {
     auto [data, address] = PopBin();
+    WriteMemory(data, address, size);
+  }
+
+  void StoreAD(uint8_t size) {
+    auto [address, data] = PopBin();
     WriteMemory(data, address, size);
   }
 
@@ -235,6 +241,44 @@ namespace run {
 
   void Duplicate() {
     Push(stack.back());
+  }
+
+  uint64_t saved_element = 0;
+  void Save() {
+    saved_element = Pop();
+  }
+
+  void Restore() {
+    Push(saved_element);
+  }
+
+  void Copy(uint64_t from, uint64_t to, uint64_t size) {
+    for (size_t i = 0; i < size; ++i) {
+      if (!IsByteAllocated(from + i) || !IsByteAllocated(to + i))
+        throw MemoryNotAllocated();
+      memory[to + i] = memory[from + i];
+    }
+  }
+
+  void CopyFT() {
+    auto size = Pop();
+    auto [from, to] = PopBin();
+    Copy(from, to, size);
+  }
+
+  void CopyTF() {
+    auto size = Pop();
+    auto [to, from] = PopBin();
+    Copy(from, to, size);
+  }
+
+  void Fill() {
+    auto [from, size] = PopBin();
+    for (uint64_t i = 0; i < size; ++i) {
+      if (!IsByteAllocated(from + i))
+        throw MemoryNotAllocated();
+      memory[from + i] = 0;
+    }
   }
 
   uint64_t PruneNum(uint64_t data, PrimitiveVariableType type) {
@@ -799,8 +843,11 @@ namespace run {
       case RPNOperatorType::kLoad:
         Load(static_cast<uint8_t>(GetSizeOfPrimitive(type)));
         break;
-      case RPNOperatorType::kStore:
-        Store(static_cast<uint8_t>(GetSizeOfPrimitive(type)));
+      case RPNOperatorType::kStoreDA:
+        StoreDA(static_cast<uint8_t>(GetSizeOfPrimitive(type)));
+        break;
+      case RPNOperatorType::kStoreAD:
+        StoreAD(static_cast<uint8_t>(GetSizeOfPrimitive(type)));
         break;
       case RPNOperatorType::kJmp:
         Jmp();
@@ -846,6 +893,21 @@ namespace run {
         break;
       case RPNOperatorType::kDuplicate:
         Duplicate();
+        break;
+      case RPNOperatorType::kSave:
+        Save();
+        break;
+      case RPNOperatorType::kRestore:
+        Restore();
+        break;
+      case RPNOperatorType::kCopyFT:
+        CopyFT();
+        break;
+      case RPNOperatorType::kCopyTF:
+        CopyTF();
+        break;
+      case RPNOperatorType::kFill:
+        Fill();
         break;
 
         // Casting operators

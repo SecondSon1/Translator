@@ -50,6 +50,7 @@ void GetNext() {
 void Program();
 
 std::map<std::wstring, std::shared_ptr<RPN>> func_rpn;
+std::map<std::wstring, uint64_t> func_size;
 std::vector<std::shared_ptr<RPN>> rpn;
 
 RPN PerformSyntaxAnalysis(const std::vector<Lexeme> & code) {
@@ -70,7 +71,7 @@ RPN PerformSyntaxAnalysis(const std::vector<Lexeme> & code) {
   result.PushNode(RPNOperator(RPNOperatorType::kPush));
   result.PushNode(RPNOperand(-1ull));
   result.PushNode(RPNOperator(RPNOperatorType::kSP));
-  result.PushNode(RPNOperator(RPNOperatorType::kStore, PrimitiveVariableType::kUint64));
+  result.PushNode(RPNOperator(RPNOperatorType::kStoreDA, PrimitiveVariableType::kUint64));
   for (std::shared_ptr<RPNNode> & node : rpn.back()->GetNodes())
     result.PushNode(std::move(node));
   AddReturn(result);
@@ -78,8 +79,13 @@ RPN PerformSyntaxAnalysis(const std::vector<Lexeme> & code) {
   uint64_t pc = result.GetNodes().size();
   for (auto & [name, cur_rpn] : func_rpn) {
     pc_by_name[name] = pc;
+    auto begin = pc;
     for (auto & node : cur_rpn->GetNodes()) {
-      result.PushNode(std::move(node));
+      if (node->GetNodeType() == NodeType::kRelativeOperand) {
+        uint64_t val = std::dynamic_pointer_cast<RPNRelativeOperand>(node)->GetValue();
+        result.PushNode(RPNOperand(val + begin));
+      } else
+        result.PushNode(std::move(node));
       ++pc;
     }
     AddReturn(result);
@@ -143,8 +149,6 @@ std::shared_ptr<TIDValue> Sizeof();
 std::shared_ptr<TIDValue> Read();
 std::shared_ptr<TIDValue> Write();
 void If();
-void Elif();
-void Else();
 void For();
 void Foreach();
 void While();
@@ -173,9 +177,19 @@ std::shared_ptr<TIDValue> Priority14();
 void PushNode(const RPNOperand & node) { rpn.back()->PushNode(node); }
 void PushNode(const RPNReferenceOperand & node) { rpn.back()->PushNode(node); }
 void PushNode(const RPNOperator & node) { rpn.back()->PushNode(node); }
+void PushNode(const RPNRelativeOperand & node) { rpn.back()->PushNode(node); }
 void LoadType(const std::shared_ptr<TIDVariableType> & type, bool need_reference) {
   if (type->GetType() != VariableType::kComplex && !need_reference)
     PushNode(RPNOperator(RPNOperatorType::kLoad, GetTypeOfVariable(type)));
+}
+
+void ReplaceReferenceOperands(uint64_t l, uint64_t r, const std::wstring & from, uint64_t to) {
+  auto & nodes = rpn.back()->GetNodes();
+  for (uint64_t i = l; i < r; ++i) {
+    if (nodes[i]->GetNodeType() == NodeType::kReferenceOperand &&
+        std::dynamic_pointer_cast<RPNReferenceOperand>(nodes[i])->GetName() == from)
+      nodes[i] = std::make_shared<RPNRelativeOperand>(to);
+  }
 }
 
 void Cast(const std::shared_ptr<TIDValue> & from, const std::shared_ptr<TIDVariableType> & to, [[maybe_unused]] bool suppress_downcast_warning = false) {
@@ -326,10 +340,12 @@ std::pair<std::wstring, std::shared_ptr<TIDVariableType>> VariableIdentifier(std
     ptr = DerivePointerFromType(ptr);
   while (IsLexeme(LexemeType::kBracket, L"[")) {
     GetNext();
+    /*
     if (!IsLexeme(LexemeType::kBracket, L"]")) {
       std::shared_ptr<TIDValue> ind_val = Expression();
       Cast(ind_val, SetConstToType(GetPrimitiveVariableType(PrimitiveVariableType::kUint32), true));
     }
+    */
     Expect(LexemeType::kBracket, L"]");
     GetNext();
     ptr = DeriveArrayFromType(ptr);
@@ -356,8 +372,10 @@ std::vector<std::pair<std::wstring, std::shared_ptr<TIDVariableType>>> Definitio
     var_type = type;
     while (IsLexeme(LexemeType::kBracket, L"[")) {
       GetNext();
+      /*
       std::shared_ptr<TIDValue> ind_val = Expression();
       Cast(ind_val, SetConstToType(GetPrimitiveVariableType(PrimitiveVariableType::kUint32), true));
+      */
       Expect(LexemeType::kBracket, L"]");
       GetNext();
       var_type = DeriveArrayFromType(var_type);
@@ -393,6 +411,11 @@ void DefinitionAddToScope() {
     if (type->GetType() == VariableType::kFunction)
       continue;
     tid.AddVariable(lexeme, name, type);
+    auto address = tid.GetVariable(name)->GetAddress();
+    PushNode(RPNOperand(address));
+    PushNode(RPNOperator(RPNOperatorType::kFromSP));
+    PushNode(RPNOperand(type->GetSize()));
+    PushNode(RPNOperator(RPNOperatorType::kFill));
   }
 }
 
@@ -490,17 +513,15 @@ std::shared_ptr<TIDVariableType> Function(const std::wstring & name,
     Block(false);
     surrounding_loop_count = temp_value;
     scope_return_type.pop_back();
-    // TODO
+    AddReturn(*rpn.back());
     uint64_t stack_size = tid.GetFunctionScopeMaxAddress();
+    func_size[tid.GetVariable(name)->GetInternalName()] = stack_size;
     tid.RemoveFunctionScope();
   } else {
     GetNext();
     PushNode(RPNOperator(RPNOperatorType::kReturn));
   }
-  auto last = rpn.back()->GetNodes().back();
-  if (last->GetNodeType() != NodeType::kOperator ||
-      std::dynamic_pointer_cast<RPNOperator>(last)->GetOperatorType() != RPNOperatorType::kReturn)
-    PushNode(RPNOperator(RPNOperatorType::kReturn));
+
   rpn.pop_back();
 
   debug("Exited Function");
@@ -565,33 +586,44 @@ void If() {
   GetNext();
   Expect(LexemeType::kParenthesis, L"(");
   GetNext();
+  std::vector<uint64_t> to_set_end;
   std::shared_ptr<TIDValue> value = Expression();
   Expect(LexemeType::kParenthesis, L")");
   GetNext();
   Cast(value, SetConstToType(GetPrimitiveVariableType(PrimitiveVariableType::kBool), true));
+  uint64_t next_ind = rpn.back()->GetNodes().size();
+  PushNode(RPNOperand(0));
+  PushNode(RPNOperator(RPNOperatorType::kJz));
   Block(true);
-  Elif();
-  if (IsLexeme(LexemeType::kReserved, L"else"))
-    Else();
-}
-
-void Elif() {
+  to_set_end.push_back(rpn.back()->GetNodes().size());
+  PushNode(RPNOperand(0));
+  PushNode(RPNOperator(RPNOperatorType::kJmp));
   while (IsLexeme(LexemeType::kReserved, L"elif")) {
     GetNext();
     Expect(LexemeType::kParenthesis, L"(");
     GetNext();
-    std::shared_ptr<TIDValue> value = Expression();
+    rpn.back()->GetNodes()[next_ind] = std::make_shared<RPNRelativeOperand>(rpn.back()->GetNodes().size());
+    value = Expression();
     Cast(value, SetConstToType(GetPrimitiveVariableType(PrimitiveVariableType::kBool), true));
     Expect(LexemeType::kParenthesis, L")");
     GetNext();
+    next_ind = rpn.back()->GetNodes().size();
+    PushNode(RPNOperand(0));
+    PushNode(RPNOperator(RPNOperatorType::kJz));
+    Block(true);
+    to_set_end.push_back(rpn.back()->GetNodes().size());
+    PushNode(RPNOperand(0));
+    PushNode(RPNOperator(RPNOperatorType::kJmp));
+  }
+  rpn.back()->GetNodes()[next_ind] = std::make_shared<RPNRelativeOperand>(rpn.back()->GetNodes().size());
+  if (IsLexeme(LexemeType::kReserved, L"else")) {
+    Expect(LexemeType::kReserved, L"else");
+    GetNext();
     Block(true);
   }
-}
-
-void Else() {
-  Expect(LexemeType::kReserved, L"else");
-  GetNext();
-  Block(true);
+  uint64_t end = rpn.back()->GetNodes().size();
+  for (uint64_t i : to_set_end)
+    rpn.back()->GetNodes()[i] = std::make_shared<RPNRelativeOperand>(end);
 }
 
 void For() {
@@ -606,12 +638,23 @@ void For() {
   else
     GetNext();
   std::shared_ptr<TIDValue> val;
-  if (!IsLexeme(LexemeType::kPunctuation, L";"))
+  uint64_t expression_start = rpn.back()->GetNodes().size();
+  if (!IsLexeme(LexemeType::kPunctuation, L";")) {
     val = Expression();
-  if (val)
-    Cast(val, GetPrimitiveVariableType(PrimitiveVariableType::kBool));
+    if (val)
+      Cast(val, GetPrimitiveVariableType(PrimitiveVariableType::kBool));
+  }
+  if (!val)
+    PushNode(RPNOperand(1));
+  uint64_t end_ind = rpn.back()->GetNodes().size();
+  PushNode(RPNOperand(0));
+  PushNode(RPNOperator(RPNOperatorType::kJz));
+  uint64_t start_ind = rpn.back()->GetNodes().size();
+  PushNode(RPNOperand(0));
+  PushNode(RPNOperator(RPNOperatorType::kJmp));
   Expect(LexemeType::kPunctuation, L";");
   GetNext();
+  uint64_t incr_start = rpn.back()->GetNodes().size();
   if (!IsLexeme(LexemeType::kParenthesis, L")")) {
     Expression();
     while (IsLexeme(LexemeType::kPunctuation, L",")) {
@@ -619,15 +662,27 @@ void For() {
       Expression();
     }
   }
+  PushNode(RPNRelativeOperand(expression_start));
+  PushNode(RPNOperator(RPNOperatorType::kJmp));
   Expect(LexemeType::kParenthesis, L")");
   GetNext();
+  uint64_t start = rpn.back()->GetNodes().size();
+
   ++surrounding_loop_count;
   Block(false);
   --surrounding_loop_count;
+  PushNode(RPNRelativeOperand(incr_start));
+  PushNode(RPNOperator(RPNOperatorType::kJmp));
+  uint64_t end = rpn.back()->GetNodes().size();
   tid.RemoveScope();
+  rpn.back()->GetNodes()[start_ind] = std::make_shared<RPNRelativeOperand>(start);
+  rpn.back()->GetNodes()[end_ind] = std::make_shared<RPNRelativeOperand>(end);
+  ReplaceReferenceOperands(start, end, L"continue", incr_start);
+  ReplaceReferenceOperands(start, end, L"break", end);
   debug("Exited For");
 }
 
+// TODO
 void Foreach() {
   Expect(LexemeType::kReserved, L"foreach");
   GetNext();
@@ -643,7 +698,14 @@ void Foreach() {
   if (arr_type->GetType()->GetType() != VariableType::kArray)
     throw TypeNotIterable(lexeme); // TODO: thrown lexeme is not the one needed lol (it's actually everywhere)
   auto expected_type = std::static_pointer_cast<TIDArrayVariableType>(arr_type->GetType())->GetValue();
-  if (expected_type != iter_type)
+  auto derived_expected = GetDerivedTypes(std::make_shared<TIDTemporaryValue>(expected_type));
+  bool ok = false;
+  for (auto type : derived_expected)
+    if (type->GetType() == iter_type) {
+      ok = true;
+      break;
+    }
+  if (!ok)
     throw TypeMismatch(lexeme, expected_type, iter_type);
   tid.AddVariable(lexeme, iter_name, iter_type);
   GetNext();
@@ -658,59 +720,55 @@ void While() {
   GetNext();
   Expect(LexemeType::kParenthesis, L"(");
   GetNext();
+  uint64_t expression_start = rpn.back()->GetNodes().size();
   std::shared_ptr<TIDValue> val = Expression();
-  Cast(val, SetConstToType(GetPrimitiveVariableType(PrimitiveVariableType::kBool), true));
   Expect(LexemeType::kParenthesis, L")");
+  Cast(val, SetConstToType(GetPrimitiveVariableType(PrimitiveVariableType::kBool), true));
+  uint64_t end_ind = rpn.back()->GetNodes().size();
+  PushNode(RPNOperand(0));
+  PushNode(RPNOperator(RPNOperatorType::kJz));
   GetNext();
+  uint64_t start = rpn.back()->GetNodes().size();
   ++surrounding_loop_count;
   Block(true);
   --surrounding_loop_count;
+  PushNode(RPNRelativeOperand(expression_start));
+  PushNode(RPNOperator(RPNOperatorType::kJmp));
+  uint64_t end = rpn.back()->GetNodes().size();
+  rpn.back()->GetNodes()[end_ind] = std::make_shared<RPNRelativeOperand>(end);
+  ReplaceReferenceOperands(start, end, L"continue", expression_start);
+  ReplaceReferenceOperands(start, end, L"break", end);
+
 }
 
 void DoWhile() {
   Expect(LexemeType::kReserved, L"do");
+  uint64_t start = rpn.back()->GetNodes().size();
   GetNext();
   Block(true);
-  Expect(LexemeType::kParenthesis, L"(");
-  GetNext();
   Expect(LexemeType::kReserved, L"while");
   GetNext();
+  uint64_t expression_start = rpn.back()->GetNodes().size();
+  Expect(LexemeType::kParenthesis, L"(");
+  GetNext();
   std::shared_ptr<TIDValue> value = Expression();
-  Cast(value, SetConstToType(GetPrimitiveVariableType(PrimitiveVariableType::kBool), true));
   Expect(LexemeType::kParenthesis, L")");
   GetNext();
   Expect(LexemeType::kPunctuation, L";");
+  Cast(value, SetConstToType(GetPrimitiveVariableType(PrimitiveVariableType::kBool), true));
+  uint64_t end_ind = rpn.back()->GetNodes().size();
+  PushNode(RPNOperand(0));
+  PushNode(RPNOperator(RPNOperatorType::kJz));
+  PushNode(RPNRelativeOperand(start));
+  PushNode(RPNOperator(RPNOperatorType::kJmp));
+  uint64_t end = rpn.back()->GetNodes().size();
+  rpn.back()->GetNodes()[end_ind] = std::make_shared<RPNRelativeOperand>(end);
+  ReplaceReferenceOperands(start, end, L"continue", expression_start);
+  ReplaceReferenceOperands(start, end, L"break", end);
   ++surrounding_loop_count;
   GetNext();
   --surrounding_loop_count;
 }
-
-// Maybe if we had extra time...
-/*void Try() {
-  Expect(LexemeType::kReserved, L"try");
-  GetNext();
-  Block();
-  Expect(LexemeType::kReserved, L"catch");
-  // TODO: any type checking would be nice
-  while (IsLexeme(LexemeType::kReserved, L"catch")) {
-    GetNext();
-    Expect(LexemeType::kParenthesis, L"(");
-    GetNext();
-    VariableParameter();
-    Expect(LexemeType::kParenthesis, L")");
-    GetNext();
-    Block();
-  }
-}
-
-void Throw() {
-  Expect(LexemeType::kReserved, L"throw");
-  GetNext();
-  Expression();
-  // TODO: wtf to do with throw
-  Expect(LexemeType::kPunctuation, L";");
-  GetNext();
-}*/
 
 void Continue() {
   Expect(LexemeType::kReserved, L"continue");
@@ -718,6 +776,8 @@ void Continue() {
     throw LoopInstructionsOutsideOfLoop(lexeme);
   GetNext();
   Expect(LexemeType::kPunctuation, L";");
+  PushNode(RPNReferenceOperand(L"continue"));
+  PushNode(RPNOperator(RPNOperatorType::kJmp));
   GetNext();
 }
 
@@ -727,6 +787,8 @@ void Break() {
     throw LoopInstructionsOutsideOfLoop(lexeme);
   GetNext();
   Expect(LexemeType::kPunctuation, L";");
+  PushNode(RPNReferenceOperand(L"break"));
+  PushNode(RPNOperator(RPNOperatorType::kJmp));
   GetNext();
 }
 
@@ -738,6 +800,17 @@ void Return() {
     value = Expression();
   Expect(LexemeType::kPunctuation, L";");
   Cast(value, scope_return_type.back());
+  if (scope_return_type.back()) {
+    PushNode(RPNOperand(9));
+    PushNode(RPNOperator(RPNOperatorType::kFromSP));
+    if (IsReference(value)) {
+      PushNode(RPNOperand(scope_return_type.back()->GetSize()));
+      PushNode(RPNOperator(RPNOperatorType::kCopyFT));
+    } else {
+      PushNode(RPNOperator(RPNOperatorType::kStoreDA, GetTypeOfVariable(value->GetType())));
+    }
+  }
+  PushNode(RPNOperator(RPNOperatorType::kReturn));
   GetNext();
 }
 
@@ -884,7 +957,7 @@ void FunctionCall(const std::shared_ptr<TIDValue> & val) {
   if (param_index < params.size())
     throw FunctionParameterListDoesNotMatch(lexeme, func_type, provided);
 
-  // TODO: RPN function call
+  // TODO: RPN function call and place returned type on stack
 }
 
 const size_t signs1_sz = /*12*/ 11; // no power (**) 'cause it messes with pointers
@@ -1203,7 +1276,7 @@ std::shared_ptr<TIDValue> Priority14() {
       auto address = tid.AddTemporaryInstance(lexeme, char_arr);
       PushNode(RPNOperand(address));
       PushNode(RPNOperator(RPNOperatorType::kFromSP));
-      PushNode(RPNOperator(RPNOperatorType::kStore, PrimitiveVariableType::kUint64));
+      PushNode(RPNOperator(RPNOperatorType::kStoreDA, PrimitiveVariableType::kUint64));
 
       PushNode(RPNOperand(address));
       PushNode(RPNOperator(RPNOperatorType::kFromSP));

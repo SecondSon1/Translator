@@ -132,8 +132,11 @@ int32_t main(const int argc, const char *argv[]) {
   std::wcout << format::bright << color::green << '0' << format::reset << " error(s) were found" << std::endl;
   std::wcout << format::bright << color::blue << log::getWarningsNum() << format::reset << " warning(s) were generated" << std::endl;
   std::wcout << std::endl << "Generated RPN:" << std::endl;
+  size_t ind = 0;
   for (auto x : rpn.GetNodes())
-    std::wcout << x->ToString() << std::endl;
+    std::wcout << ind++ << L": " << x->ToString() << std::endl;
+
+  Execute(rpn);
 
   return 0;
 }

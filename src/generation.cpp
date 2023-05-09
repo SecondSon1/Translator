@@ -7,7 +7,8 @@ std::wstring ToString(RPNOperatorType type) {
   return L"" #x
   switch (type) {
     OperatorCase(kLoad);
-    OperatorCase(kStore);
+    OperatorCase(kStoreDA);
+    OperatorCase(kStoreAD);
     OperatorCase(kJmp);
     OperatorCase(kCall);
     OperatorCase(kJz);
@@ -23,6 +24,11 @@ std::wstring ToString(RPNOperatorType type) {
     OperatorCase(kFuncSP);
     OperatorCase(kDump);
     OperatorCase(kDuplicate);
+    OperatorCase(kSave);
+    OperatorCase(kRestore);
+    OperatorCase(kCopyFT);
+    OperatorCase(kCopyTF);
+    OperatorCase(kFill);
     OperatorCase(kToF64);
     OperatorCase(kFromF64);
     OperatorCase(kToBool);
@@ -66,12 +72,28 @@ void AddReturn(RPN & rpn) {
 }
 
 void LoadIfReference(const std::shared_ptr<TIDValue> & val, RPN & rpn) {
-  if (val->GetValueType() == TIDValueType::kTemporary &&
-      !val->GetType()->IsReference()) return;
-  rpn.PushNode(RPNOperator(RPNOperatorType::kLoad, GetTypeOfVariable(val->GetType())));
+  if (IsReference(val))
+    rpn.PushNode(RPNOperator(RPNOperatorType::kLoad, GetTypeOfVariable(val->GetType())));
+}
+void LoadIfReference(const std::shared_ptr<TIDVariableType> & val, RPN & rpn) {
+  if (IsReference(val))
+    rpn.PushNode(RPNOperator(RPNOperatorType::kLoad, GetTypeOfVariable(val)));
+}
+
+void LoadValue(const std::shared_ptr<TIDValue> & val, const std::shared_ptr<TIDVariableType> & type, RPN & rpn) {
+  if (IsReference(val))
+    rpn.PushNode(RPNOperator(RPNOperatorType::kLoad, GetTypeOfVariable(val->GetType())));
+  if (!IsReference(type))
+    rpn.PushNode(RPNOperator(RPNOperatorType::kLoad, GetTypeOfVariable(type)));
 }
 
 void LoadPointer(const std::shared_ptr<TIDValue> & ptr, RPN & rpn) {
   LoadIfReference(ptr, rpn);
-  rpn.PushNode(RPNOperator(RPNOperatorType::kLoad, GetTypeOfVariable(ptr->GetType())));
+}
+
+bool IsReference(const std::shared_ptr<TIDValue> & value) {
+  return value->GetValueType() == TIDValueType::kVariable || value->GetType()->IsReference();
+}
+bool IsReference(const std::shared_ptr<TIDVariableType> & type) {
+  return type->IsReference();
 }

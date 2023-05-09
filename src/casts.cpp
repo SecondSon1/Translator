@@ -37,7 +37,7 @@ int8_t CastValueAsInt(std::shared_ptr<TIDValue> from, std::shared_ptr<TIDVariabl
   auto from_type = from->GetType();
   if (!from_type && !to) return 1;
   if (!from_type || !to) return -1;
-  if (from == to) return 1;
+  if (from->GetType() == to) return 1;
   bool from_ref = from->GetValueType() == TIDValueType::kVariable || from_type->IsReference();
   bool to_ref = to->IsReference();
   if ((from_type->IsConst() && !to->IsConst()) || (!from_ref && to_ref))
@@ -56,8 +56,8 @@ int8_t CastValueAsInt(std::shared_ptr<TIDValue> from, std::shared_ptr<TIDVariabl
   }
   // which primitives we can cast to which
   if (!set_up_casting) SetUpCastingPrimitives();
-  PrimitiveVariableType from_pr = std::static_pointer_cast<TIDPrimitiveVariableType>(from)->GetPrimitiveType();
-  PrimitiveVariableType to_pr = std::static_pointer_cast<TIDPrimitiveVariableType>(to)->GetPrimitiveType();
+  PrimitiveVariableType from_pr = std::dynamic_pointer_cast<TIDPrimitiveVariableType>(from->GetType())->GetPrimitiveType();
+  PrimitiveVariableType to_pr = std::dynamic_pointer_cast<TIDPrimitiveVariableType>(to)->GetPrimitiveType();
   //return can_cast[static_cast<uint8_t>(from_pr)][static_cast<uint8_t>(to_pr)];
   return GetSizeOfPrimitive(from_pr) <= GetSizeOfPrimitive(to_pr);
 }
@@ -74,9 +74,9 @@ std::shared_ptr<TIDValue> CastValue(const std::shared_ptr<TIDValue> & val, std::
   if (!type || !val->GetType())
     return std::make_shared<TIDTemporaryValue>(nullptr);
   type = SetParamsToType(type, val->GetType()->IsConst(), val->GetType()->IsReference());
+  if (val->GetType() == type) return val;
   if (!CanCast(val, type))
     throw UnableToCast(val, type);
-  if (val->GetType() == type) return val;
   else return std::make_shared<TIDTemporaryValue>(SetParamsToType(type, true, false));
 }
 
