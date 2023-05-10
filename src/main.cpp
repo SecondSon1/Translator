@@ -125,9 +125,13 @@ int32_t main(const int argc, const char *argv[]) {
     std::wcout << format::bright << color::blue << log::getWarningsNum() << format::reset << " warning(s) were generated" << std::endl;
     return 2;
   }
-  catch (...) {
-    std::wcout << "Something went wrong. We are sorry about it";
+  catch (const std::exception & e) {
+    std::wcout << "Something went wrong. We are sorry about it" << std::endl << e.what() << std::endl;
     return 3;
+  }
+  catch (...) {
+    std::wcout << "Something went wrong. We are sorry about it" << std::endl;
+    return 4;
   }
   std::wcout << format::bright << color::green << '0' << format::reset << " error(s) were found" << std::endl;
   std::wcout << format::bright << color::blue << log::getWarningsNum() << format::reset << " warning(s) were generated" << std::endl;
