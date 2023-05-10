@@ -1325,7 +1325,7 @@ std::shared_ptr<TIDValue> Priority14() {
         PushNode(RPNOperand(value));
     } else if (IsLexeme(LexemeType::kIdentifier)) {
       if (lexeme.GetValue() == L"nullptr") {
-        PushNode(RPNOperand(-2ull));
+        PushNode(RPNOperand(NULLPTR));
         return std::make_shared<TIDTemporaryValue>(SetConstToType(DerivePointerFromType(
                 GetPrimitiveVariableType(PrimitiveVariableType::kUint64)), true));
       }

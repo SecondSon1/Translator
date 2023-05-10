@@ -5,30 +5,104 @@ for (int32 i = 0; i < size(inp); ++i) {
     x *= 10;
     x += inp[i] - '0';
 }
-int32 a = 1, b = 0, c = a + b;
-while (x--) {
-    a = b;
-    b = c;
-    c = a + b;
+struct S {
+   int32 a = 1, b, c = a + b;
 }
-x = c;
+S (*fib) = new(S);
+*fib = S();
+while (x--) {
+    (*fib).a = (*fib).b;
+    (*fib).b = (*fib).c;
+    (*fib).c = (*fib).a + (*fib).b;
+}
+x = (*fib).c;
 if (x == 0) { write("0"); return 0; }
 bool sign = x < 0;
 if (x < 0) x = -x;
 int64 y = x;
 int32 len = 0;
 while (y) {
-y /= 10;
-len++;
+    y /= 10;
+    len++;
 }
 char res[] = new(char, len + sign);
 if (sign) res[0] = '-';
 int32 ind = len-1;
 y = x;
 while (y) {
-res[ind--] = '0' + (y % 10);
-y /= 10;
+    res[ind--] = '0' + (y % 10);
+    y /= 10;
 }
 write(res);
 write("\n");
 return 0;
+
+
+/*
+== struct
+6: 1
+7: 13
+8: kFromSP
+9: kStoreDA
+10: 1
+11: 21
+12: kFromSP
+13: kStoreDA
+== copy struct to heap mem
+14: 12
+15: kNew
+16: kDuplicate
+17: 13
+18: kFromSP
+19: 12
+20: kCopyTF
+21: 13
+22: kFromSP
+23: kStoreDA
+
+== new struct
+24: 12
+25: kNew
+26: 21
+27: kFromSP
+28: kStoreDA
+
+== *fib
+29: 21
+30: kFromSP
+31: kLoad
+
+== S()
+32: 29
+33: kFromSP
+34: kDuplicate
+35: 13
+36: kFromSP
+37: kLoad
+38: 12
+39: kCopyTF
+
+== '='
+40: kSave
+41: kDuplicate
+42: kRestore
+43: 8
+44: kCopyTF
+45: kDump
+
+== return ...
+46: 21
+47: kFromSP
+48: kLoad
+49: 8
+50: kAdd
+51: kLoad
+52: 8
+53: kFromSP
+54: 1
+55: kStoreAD
+56: 9
+57: kFromSP
+58: kStoreDA
+59: kReturn
+*/

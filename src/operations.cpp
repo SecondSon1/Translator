@@ -232,7 +232,7 @@ std::shared_ptr<TIDValue> BinaryOperationRPN(const std::shared_ptr<TIDValue> & l
         if (lhs_type->GetType() == VariableType::kComplex) {
           // complex is always an address
           // FROM TO SIZE OP::COPY; from = rhs; to = lhs; size = sizeof(struct)
-          rpn.PushNode(RPNOperand(lhs_type->GetSize()));
+          rpn.PushNode(RPNOperand(SetReferenceToType(lhs_type, false)->GetSize()));
           rpn.PushNode(RPNOperator(RPNOperatorType::kCopyTF));
         } else {
           Cast(rhs, SetParamsToType(rhs_type, true, false), rpn);
