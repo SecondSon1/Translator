@@ -213,11 +213,6 @@ namespace run {
     std::getline(std::wcin, line);
     if (line.back() == L'\n') line.pop_back();
 
-    auto address = ReadMemory(var_address, 8); // address of start of char[]
-    if (address != NULLPTR) {
-      // Read reallocates string
-      DeleteMemory(address, ReadMemory(address, 4) + 4);
-    }
     auto new_address = NewMemory(line.size() + 4);
     WriteMemory(line.size(), new_address, 4);
     for (size_t i = 0; i < line.size(); ++i)

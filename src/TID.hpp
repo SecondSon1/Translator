@@ -222,10 +222,12 @@ class TIDVariable : public TIDValue {
 
 std::vector<std::shared_ptr<TIDValue>> GetDerivedTypes(const std::shared_ptr<TIDValue> & type);
 
+class RPN;
+
 class TID {
  public:
   TID() {
-    AddFunctionScope(SetConstToType(
+    AddFunctionScope(L"$global", SetConstToType(
       GetPrimitiveVariableType(PrimitiveVariableType::kInt32), true
     ));
   }
@@ -272,9 +274,19 @@ class TID {
 
   uint64_t GetNextAddress() const { return nodes_.back().next_address_; }
 
+  std::wstring GetScopeNameOfVariable(const std::wstring & name) const {
+    for (size_t scope_index = nodes_.size() - 1; ~scope_index; --scope_index)
+      if (nodes_[scope_index].variables_.count(name))
+        return nodes_[scope_index].func_name;
+    // Not found, returning empty variable
+    return {};
+  }
+
+  void LoadVariableAddress(const std::wstring & name, RPN & rpn) const;
+
  public:
   void AddScope();
-  void AddFunctionScope(const std::shared_ptr<TIDVariableType> & return_type);
+  void AddFunctionScope(const std::wstring & name, const std::shared_ptr<TIDVariableType> & return_type);
   void RemoveScope();
   void RemoveFunctionScope();
   void AddComplexStruct(const Lexeme & lexeme,
@@ -294,6 +306,7 @@ class TID {
     std::map<std::wstring, std::shared_ptr<TIDVariable>> variables_;
     uint32_t child_node_cnt_ = 0;
     uint64_t next_address_ = 0;
+    std::wstring func_name;
   };
 
   uint32_t temp_structs = 0;

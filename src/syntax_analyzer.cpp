@@ -335,8 +335,8 @@ void Struct() {
   std::wstring def_var_name = internal_name + L"$def";
   tid.AddVariable(lexeme, def_var_name, SetParamsToType(DerivePointerFromType(complex_type), false, false));
   auto def_var = tid.GetVariable(def_var_name);
-  PushNode(RPNOperand(def_var->GetAddress()));
-  PushNode(RPNOperator(RPNOperatorType::kFromSP));
+  assert(def_var);
+  tid.LoadVariableAddress(def_var_name, *rpn.back());
   PushNode(RPNOperator(RPNOperatorType::kStoreDA, PrimitiveVariableType::kUint64));
 
   Expect(LexemeType::kPunctuation, L"}");
@@ -418,14 +418,11 @@ uint64_t Definition() {
     Cast(expr_val, SetConstToType(var_type, true));
     auto expr_type = expr_val->GetType();
     assert(expr_type);
+    tid.LoadVariableAddress(var->GetName(), *rpn.back());
     if (expr_type->GetType() == VariableType::kComplex) {
-      PushNode(RPNOperand(var->GetAddress()));
-      PushNode(RPNOperator(RPNOperatorType::kFromSP));
       PushNode(RPNOperand(expr_type->GetSize()));
       PushNode(RPNOperator(RPNOperatorType::kCopyFT));
     } else {
-      PushNode(RPNOperand(var->GetAddress()));
-      PushNode(RPNOperator(RPNOperatorType::kFromSP));
       PushNode(RPNOperator(RPNOperatorType::kStoreDA, GetTypeOfVariable(var_type)));
     }
   };
@@ -530,10 +527,12 @@ std::shared_ptr<TIDVariableType> Function(const std::wstring & name,
   }
 
   rpn.push_back(std::make_shared<RPN>());
-  func_rpn[tid.GetVariable(name)->GetInternalName()] = rpn.back();
+  auto var = tid.GetVariable(name);
+  assert(var);
+  func_rpn[var->GetInternalName()] = rpn.back();
 
   if (!IsLexeme(LexemeType::kPunctuation, L";")) {
-    tid.AddFunctionScope(return_type);
+    tid.AddFunctionScope(var->GetInternalName(), return_type);
     scope_return_type.push_back(return_type);
     for (auto & [var_name, var_type] : parameters.first)
       tid.AddVariable(lexeme, var_name, var_type);
@@ -1030,7 +1029,8 @@ void FunctionCall(const std::shared_ptr<TIDValue> & val) {
   if (param_index < params.size())
     throw FunctionParameterListDoesNotMatch(lexeme, func_type, provided);
 
-  // TODO: RPN function call and place returned type on stack
+  PushNode(RPNOperand(func_size[std::dynamic_pointer_cast<TIDVariable>(val)->GetInternalName()]));
+  PushNode(RPNOperator(RPNOperatorType::kPush));
 }
 
 const size_t signs1_sz = /*12*/ 11; // no power (**) 'cause it messes with pointers
@@ -1340,21 +1340,20 @@ std::shared_ptr<TIDValue> Priority14() {
         PushNode(RPNOperand(address));
         PushNode(RPNOperator(RPNOperatorType::kFromSP));
         PushNode(RPNOperator(RPNOperatorType::kDuplicate));
-        auto def_var = tid.GetVariable(
-            std::dynamic_pointer_cast<TIDComplexVariableType>(struct_type)->GetInternalName() + L"$def");
+        std::wstring internal_name = std::dynamic_pointer_cast<TIDComplexVariableType>(struct_type)->GetInternalName();
+        auto def_var = tid.GetVariable(internal_name + L"$def");
         assert(def_var && def_var->GetType());
-        PushNode(RPNOperand(def_var->GetAddress()));
-        PushNode(RPNOperator(RPNOperatorType::kFromSP));
-        PushNode(RPNOperator(RPNOperatorType::kLoad, PrimitiveVariableType::kUint64));
+        tid.LoadVariableAddress(internal_name + L"$def", *rpn.back());
+        LoadIfReference(def_var, *rpn.back());
         PushNode(RPNOperand(struct_type->GetSize()));
         PushNode(RPNOperator(RPNOperatorType::kCopyTF));
       } else {
-        val = tid.GetVariable(lexeme.GetValue());
+        auto var = tid.GetVariable(lexeme.GetValue());
+        val = var;
         if (!val)
           throw UndeclaredIdentifier(lexeme);
         auto type = val->GetType();
-        PushNode(RPNOperand(std::dynamic_pointer_cast<TIDVariable>(val)->GetAddress()));
-        PushNode(RPNOperator(RPNOperatorType::kFromSP));
+        tid.LoadVariableAddress(var->GetName(), *rpn.back());
       }
     } else if (IsLexeme(LexemeType::kStringLiteral)) {
       auto char_arr = SetConstToType(DeriveArrayFromType(
