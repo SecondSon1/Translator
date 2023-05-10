@@ -1,7 +1,42 @@
-write("bebralang\n");
-
-char s[];
-read(s);
-if (size(s) >= 2)
-  s[1] = 'x';
-write(s);
+int32 arr[];
+int32 n = 10;
+arr = new(int32, n);
+char inp[];
+for (int32 i = 0; i < n; ++i) {
+    read(inp);
+    // write(inp);
+    int32 x = 0;
+    int32 sign = 1;
+    int32 j = 0;
+    if (inp[0] == '-') { ++j; sign = -1; }
+    for (; j < size(inp); ++j) {
+        x *= 10;
+        x += inp[j] - '0';
+    }
+    arr[i] = x * sign;
+}
+for (int32 i = 0; i < n; ++i) {
+    for (int32 j = 1; j < n - i; ++j) {
+        if (arr[j - 1] > arr[j]) {
+            int32 tmp = arr[j - 1];
+            arr[j - 1] = arr[j];
+            arr[j] = tmp;
+        }
+    }
+}
+for (int32 i = 0; i < n; ++i) {
+    int32 x = arr[i];
+    if (x == 0) { write("0 "); continue; }
+    bool sign = x < 0;
+    if (sign) { x = -x; write("-"); }
+    char lmao[];
+    lmao = new(char, 1);
+    int32 pw = 1000000000;
+    while (x / pw == 0) pw /= 10;
+    for (; pw >= 1; pw /= 10) {
+        lmao[0] = (x / pw) % 10 + '0';
+        write(lmao);
+    }
+    write(" ");
+}
+write("\n");

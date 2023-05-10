@@ -108,20 +108,33 @@ int32_t main(const int argc, const char *argv[]) {
     std::wcout << format::bright << color::green << '0' << format::reset << " error(s) were found" << std::endl;
     std::wcout << format::bright << color::blue << log::getWarningsNum() << format::reset << " warning(s) were generated" << std::endl;
 
-#ifdef RPN_EXECUTING_TESTING
+#if defined(RPN_EXECUTING_TESTING) && RPN_EXECUTING_TESTING
     std::wcout << std::endl << "Generated RPN:" << std::endl;
     size_t ind = 0;
     for (auto x : rpn.GetNodes())
       std::wcout << ind++ << L": " << x->ToString() << std::endl;
 #endif
 
+    if (!saveProgram(options["outFile"], rpn)) {
+      std::wcout << format::bright << color::red << "Cannot open file " << format::reset;
+      std::cout << options["outFile"] << std::endl;
+      return 4;
+    }
+    std::wcout << format::bright << color::blue << "Saved to " << format::reset;
+    std::cout << options["outFile"] << std::endl;
   }
 
   if (options["runFile"].size() > 0) {
     // Execute file
-    // TODO: reading
-    //int32_t ret_code = Execute(rpn);
-    //std::wcout << L"Return code: " << std::to_wstring(ret_code) << std::endl;
+    RPN rpn;
+    if (!readProgram(options["runFile"], rpn)) {
+      std::wcout << format::bright << color::red << "Cannot open file " << format::reset;
+      std::cout << options["runFile"] << std::endl;
+      return 5;
+    }
+    int32_t ret_code = Execute(rpn);
+    std::wcout << L"Return code: " << std::to_wstring(ret_code) << std::endl;
   }
+
   return 0;
 }
