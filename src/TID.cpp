@@ -254,11 +254,11 @@ std::vector<std::shared_ptr<TIDValue>> GetDerivedTypes(const std::shared_ptr<TID
 void TID::LoadVariableAddress(const std::wstring & name, RPN & rpn) const {
   for (size_t i = nodes_.size() - 1; ~i; --i) {
     if (nodes_[i].variables_.count(name)) {
-      rpn.PushNode(RPNOperand(nodes_.back().variables_.at(name)->GetAddress()));
-      if (nodes_[i].func_name == nodes_.back().func_name) {
+      rpn.PushNode(RPNOperand(nodes_[i].variables_.at(name)->GetAddress()));
+      if (nodes_[i].func_name_ == nodes_.back().func_name_) {
         rpn.PushNode(RPNOperator(RPNOperatorType::kFromSP));
       } else {
-        rpn.PushNode(RPNReferenceOperand(nodes_[i].func_name));
+        rpn.PushNode(RPNReferenceOperand(nodes_[i].func_name_));
         rpn.PushNode(RPNOperator(RPNOperatorType::kFuncSP));
         rpn.PushNode(RPNOperator(RPNOperatorType::kAdd, PrimitiveVariableType::kUint64));
       }
@@ -271,11 +271,12 @@ void TID::LoadVariableAddress(const std::wstring & name, RPN & rpn) const {
 void TID::AddScope() {
   nodes_.emplace_back();
   nodes_.back().next_address_ = nodes_[nodes_.size() - 2].next_address_;
+  nodes_.back().func_name_ = nodes_[nodes_.size() - 2].func_name_;
 }
 
 void TID::AddFunctionScope(const std::wstring & name, const std::shared_ptr<TIDVariableType> & return_type) {
   nodes_.emplace_back();
-  nodes_.back().func_name = name;
+  nodes_.back().func_name_ = name;
   uint32_t size_for_return = return_type ? return_type->GetSize() + 1 : 0;
   nodes_.back().next_address_ = size_for_return + 8 /* first 8 bytes are pointer for where to return after function is complete */;
   max_address_.push_back(nodes_.back().next_address_);

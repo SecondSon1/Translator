@@ -229,7 +229,7 @@ void Action() {
     std::shared_ptr<TIDValue> val;
     if (!IsLexeme(LexemeType::kPunctuation, L";"))
       val = Expression();
-    if (val->GetType())
+    if (val && val->GetType())
       PushNode(RPNOperator(RPNOperatorType::kDump));
     Expect(LexemeType::kPunctuation, L";");
     GetNext();

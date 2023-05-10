@@ -143,6 +143,13 @@ void SetUpBinaryOperations() {
           binary_operations[op][{ { lhs_val_type, const_bool_type }, { rhs_val_type, const_bool_type } }] = const_bool_type;
     }
     std::shared_ptr<TIDVariableType> ref_bool_type = SetParamsToType(bool_type, false, true);
+    for (auto rhs_val_type : value_types) {
+      binary_operations[BinaryOperator::kAssignment][{ { TIDValueType::kVariable, bool_type },
+                                                       { rhs_val_type, const_bool_type } }] = ref_bool_type;
+
+      binary_operations[BinaryOperator::kAssignment][{ { TIDValueType::kTemporary, ref_bool_type },
+                                                       { rhs_val_type, const_bool_type } }] = ref_bool_type;
+    }
     for (BinaryOperator op : assignment_bitwise_ops) {
       for (auto rhs_val_type : value_types) {
         binary_operations[op][{ { TIDValueType::kVariable, bool_type }, { rhs_val_type, const_bool_type } }] = ref_bool_type;

@@ -277,7 +277,7 @@ class TID {
   std::wstring GetScopeNameOfVariable(const std::wstring & name) const {
     for (size_t scope_index = nodes_.size() - 1; ~scope_index; --scope_index)
       if (nodes_[scope_index].variables_.count(name))
-        return nodes_[scope_index].func_name;
+        return nodes_[scope_index].func_name_;
     // Not found, returning empty variable
     return {};
   }
@@ -306,7 +306,7 @@ class TID {
     std::map<std::wstring, std::shared_ptr<TIDVariable>> variables_;
     uint32_t child_node_cnt_ = 0;
     uint64_t next_address_ = 0;
-    std::wstring func_name;
+    std::wstring func_name_;
   };
 
   uint32_t temp_structs = 0;
